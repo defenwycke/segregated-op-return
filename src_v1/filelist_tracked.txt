@@ -1,0 +1,8 @@
+src/CMakeLists.txt
+src/consensus/consensus.h
+src/consensus/tx_check.cpp
+src/core_read.cpp
+src/core_write.cpp
+src/primitives/transaction.cpp
+src/primitives/transaction.h
+src/rpc/rawtransaction.cpp
