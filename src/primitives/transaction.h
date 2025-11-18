@@ -1,3 +1,4 @@
+// Copyright (c) Defenwycke - segOP
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
@@ -353,9 +354,11 @@ private:
     const bool m_has_witness;
     const Txid hash;
     const Wtxid m_witness_hash;
+    const Fullxid m_full_hash; //!< Hash of full extended tx (incl. segOP)
 
     Txid ComputeHash() const;
     Wtxid ComputeWitnessHash() const;
+    Fullxid ComputeFullxid() const; //segOP
 
     bool ComputeHasWitness() const;
 
@@ -382,6 +385,7 @@ public:
 
     const Txid& GetHash() const LIFETIMEBOUND { return hash; }
     const Wtxid& GetWitnessHash() const LIFETIMEBOUND { return m_witness_hash; };
+    const Fullxid& GetFullxid() const LIFETIMEBOUND { return m_full_hash; } //segOP
 
     // Return sum of txouts.
     CAmount GetValueOut() const;

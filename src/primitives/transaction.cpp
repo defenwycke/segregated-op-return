@@ -1,3 +1,4 @@
+// Copyright (c) 2025 Defenwycke - segOP
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
@@ -99,6 +100,8 @@ CMutableTransaction::CMutableTransaction(const CTransaction& tx)
 Txid CMutableTransaction::GetHash() const
 {
     // Hash of the transaction without witness (and without segwit discount).
+    // This helper is used internally by the wallet; consensus txid is defined
+    // by CTransaction::ComputeHash().
     return Txid::FromUint256((HashWriter{} << TX_NO_WITNESS(*this)).GetHash());
 }
 
@@ -113,21 +116,48 @@ bool CTransaction::ComputeHasWitness() const
 
 Txid CTransaction::ComputeHash() const
 {
-    // Legacy txid: no witness, but includes segOP, since segOP lives in the
-    // non-witness serialization lane and pays full weight.
-    return Txid::FromUint256((HashWriter{} << TX_NO_WITNESS(*this)).GetHash());
+    // Spec §7.2.1: txid is the legacy non-witness serialization that ignores
+    // marker, flag, witness *and segOP*. To preserve that behaviour, hash a
+    // copy of the transaction with segOP stripped.
+    CMutableTransaction tx_legacy{*this};
+    tx_legacy.segop_payload.SetNull();
+
+    return Txid::FromUint256((HashWriter{} << TX_NO_WITNESS(tx_legacy)).GetHash());
 }
 
 Wtxid CTransaction::ComputeWitnessHash() const
 {
-    // If there is no witness, wtxid == txid (BIP141 behaviour).
+    // Spec §7.2.2 and BIP141: if there is no witness, wtxid == txid.
     if (!HasWitness()) {
         return Wtxid::FromUint256(hash.ToUint256());
     }
 
-    // With witness: hash over full-with-witness serialization (segOP lives in
-    // the non-witness lane and is *not* discounted).
-    return Wtxid::FromUint256((HashWriter{} << TX_WITH_WITNESS(*this)).GetHash());
+    // With witness: wtxid is computed over the extended-with-witness
+    // serialization *excluding segOP*. So we hash a copy with segOP stripped.
+    CMutableTransaction tx_extended{*this};
+    tx_extended.segop_payload.SetNull();
+
+    return Wtxid::FromUint256((HashWriter{} << TX_WITH_WITNESS(tx_extended)).GetHash());
+}
+
+Fullxid CTransaction::ComputeFullxid() const
+{
+    // Spec §7.2.3: fullxid = TAGGED_HASH("segop:fullxid", extended_serialization)
+    // where extended_serialization is the full extended wire format:
+    //
+    //   nVersion || marker || flag || vin || vout ||
+    //   [witness data, if present] ||
+    //   [segOP section, if present] ||
+    //   nLockTime
+    //
+    // TX_WITH_WITNESS(*this) is defined to emit exactly that extended
+    // serialization for segOP-aware nodes, so we feed it straight into
+    // a tagged HashWriter.
+
+    HashWriter hw = TaggedHash("segop:fullxid");
+    hw << TX_WITH_WITNESS(*this);
+
+    return Fullxid::FromUint256(hw.GetHash());
 }
 
 /** CTransaction (public) *****************************************************/
@@ -140,7 +170,8 @@ CTransaction::CTransaction(const CMutableTransaction& tx)
       segop_payload(tx.segop_payload),
       m_has_witness{ComputeHasWitness()},
       hash{ComputeHash()},
-      m_witness_hash{ComputeWitnessHash()}
+      m_witness_hash{ComputeWitnessHash()},
+      m_full_hash{ComputeFullxid()}
 {
 }
 
@@ -152,7 +183,8 @@ CTransaction::CTransaction(CMutableTransaction&& tx)
       segop_payload(std::move(tx.segop_payload)),
       m_has_witness{ComputeHasWitness()},
       hash{ComputeHash()},
-      m_witness_hash{ComputeWitnessHash()}
+      m_witness_hash{ComputeWitnessHash()},
+      m_full_hash{ComputeFullxid()}
 {
 }
 
@@ -171,7 +203,8 @@ CAmount CTransaction::GetValueOut() const
 
 unsigned int CTransaction::GetTotalSize() const
 {
-    // Full serialized size including witness (and segOP in the base lane).
+    // Full serialized size in extended-with-witness form, which for segOP-aware
+    // nodes includes the segOP section between witness (if any) and nLockTime.
     return ::GetSerializeSize(TX_WITH_WITNESS(*this));
 }
 

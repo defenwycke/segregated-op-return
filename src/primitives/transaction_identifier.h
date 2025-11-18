@@ -68,6 +68,8 @@ public:
 using Txid = transaction_identifier<false>;
 /** Wtxid commits to all transaction fields including the witness. */
 using Wtxid = transaction_identifier<true>;
+/** Fullxid commits to all transaction fields including the segOP. */
+using Fullxid = transaction_identifier<true>; // full extended tx id (witness + segOP)cd /root/bitcoin-segop
 
 template <typename T>
 concept TxidOrWtxid = std::is_same_v<T, Txid> || std::is_same_v<T, Wtxid>;

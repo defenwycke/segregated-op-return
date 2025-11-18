@@ -174,6 +174,9 @@ void TxToUniv(const CTransaction& tx, const uint256& block_hash, UniValue& entry
 
     entry.pushKV("txid", tx.GetHash().GetHex());
     entry.pushKV("hash", tx.GetWitnessHash().GetHex());
+    if (!tx.segop_payload.IsNull()) {
+    entry.pushKV("fullxid", tx.GetFullxid().ToString());
+    }
     entry.pushKV("version", tx.version);
     entry.pushKV("size", tx.GetTotalSize());
     entry.pushKV("vsize", (GetTransactionWeight(tx) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR);

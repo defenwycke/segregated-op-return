@@ -1,3 +1,4 @@
+// Copyright (c) 2025 Defenwycke - segOP
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
@@ -32,6 +33,7 @@
 #include <script/sign.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
+#include <span.h>
 #include <uint256.h>
 #include <undo.h>
 #include <util/bip32.h>
@@ -46,6 +48,9 @@
 #include <numeric>
 
 #include <univalue.h>
+
+#include <crypto/sha256.h> // segOP: for P2SOP commitment hashing
+#include <segop/segop.h>          // CSegopPayload
 
 using node::AnalyzePSBT;
 using node::FindCoins;
@@ -488,6 +493,183 @@ static RPCHelpMan decoderawtransaction()
     };
 }
 
+//////////////////
+// segOP: best-effort TLV decoder for RPC.
+//
+// This is *not* consensus; consensus validation of the raw payload
+// (including canonical CompactSize) lives in segop.h / tx_check.cpp.
+//
+// TLV layout (spec §5.2 / §6):
+//   [ type (1 byte) ]
+//   [ length (CompactSize) ]
+//   [ value (length bytes) ]
+// repeated back-to-back with no extra header.
+//
+// Known types (v1):
+//   0x01 = TEXT_UTF8    → kind: "text", plus "text" field
+//   0x02 = JSON_UTF8    → kind: "json", "text" (raw JSON), optional "parsed"
+//   0x03 = BINARY_BLOB  → kind: "blob"
+//
+// Unknown types are surfaced as opaque records with:
+//   type / length / value_hex / kind: "unknown".
+
+static UniValue DecodeSegopTlv(const CSegopPayload& segop)
+{
+    UniValue out(UniValue::VARR);
+
+    const std::vector<unsigned char>& d = segop.data;
+    const size_t n = d.size();
+    size_t i = 0;
+
+    while (i < n) {
+        // Need at least a type byte
+        if (n - i < 1) break;
+
+        const uint8_t t = d[i++];
+
+        // Read CompactSize length (same rules as SegopIsValidTLV)
+        uint64_t len64 = 0;
+        if (!SegopReadCompactSize(d, i, len64)) {
+            // Malformed length – consensus would have rejected already.
+            // For RPC, stop decoding gracefully.
+            break;
+        }
+
+        // Bounds check: not enough bytes for the value
+        if (len64 > (n - i)) {
+            break;
+        }
+        const size_t len = static_cast<size_t>(len64);
+
+        // Base record
+        UniValue rec(UniValue::VOBJ);
+        rec.pushKV("type", strprintf("0x%02x", t));
+        rec.pushKV("length", static_cast<uint64_t>(len));
+
+        // Raw value in hex for all types.
+        auto span_val = MakeUCharSpan(d).subspan(i, len);
+        rec.pushKV("value_hex", HexStr(span_val));
+
+        // Default kind is "unknown" – overridden for known types below.
+        std::string kind = "unknown";
+
+        // 0x01 = TEXT_UTF8
+        if (t == SegopTlvType::TEXT_UTF8 || t == 0x01) {
+            kind = "text";
+            std::string text(reinterpret_cast<const char*>(&d[i]),
+                             reinterpret_cast<const char*>(&d[i]) + len);
+            rec.pushKV("text", text);
+        }
+
+        // 0x02 = JSON_UTF8
+        if (t == SegopTlvType::JSON_UTF8 || t == 0x02) {
+            kind = "json";
+            std::string json_str(reinterpret_cast<const char*>(&d[i]),
+                                 reinterpret_cast<const char*>(&d[i]) + len);
+
+            // Always expose the raw JSON string as "text"
+            rec.pushKV("text", json_str);
+
+            UniValue json_val;
+            if (json_val.read(json_str)) {
+                // Parsed JSON object/array/etc
+                rec.pushKV("parsed", json_val);
+            } else {
+                // Not valid JSON, but still useful to see raw
+                rec.pushKV("json_raw", json_str);
+            }
+        }
+
+        // 0x03 = BINARY_BLOB: we don't add text, just mark kind=blob.
+        if (t == SegopTlvType::BINARY_BLOB || t == 0x03) {
+            kind = "blob";
+        }
+
+        rec.pushKV("kind", kind);
+
+        out.push_back(std::move(rec));
+
+        // Advance over the value bytes to the next TLV record
+        i += len;
+    }
+
+    return out;
+}
+
+RPCHelpMan decodesegop()
+{
+    return RPCHelpMan{
+        "decodesegop",
+        "Decode the segOP payload from a raw transaction hex.\n"
+        "Returns basic information about the segOP lane, and a TLV view\n"
+        "for segOP payloads encoded as [type(1)][len(varint)][value].\n",
+        {
+            {"hexstring", RPCArg::Type::STR, RPCArg::Optional::NO,
+             "The raw transaction hex string."},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::BOOL, "has_segop", "Whether the transaction contains a segOP payload."},
+                {RPCResult::Type::NUM,  "version",   "segOP version (if present)."},
+                {RPCResult::Type::NUM,  "size",      "segOP payload size in bytes."},
+                {RPCResult::Type::STR_HEX, "hex",    "segOP payload bytes as hex."},
+                {RPCResult::Type::ARR, "tlv",        "Parsed TLV view of the payload (if present).",
+                    {
+                        {RPCResult::Type::OBJ, "", "",
+                            {
+                                {RPCResult::Type::STR,      "type",      "TLV type (e.g. \"0x01\")."},
+                                {RPCResult::Type::NUM,      "length",    "TLV value length in bytes."},
+                                {RPCResult::Type::STR_HEX,  "value_hex", "Raw value bytes as hex."},
+                                {RPCResult::Type::STR,      "text",      "Decoded UTF-8 text (for type 0x01, when printable)."},
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("segopsend",
+                "\"bcrt1qdest...\" 0.001 \"segOP TLV test payload\"") +
+            "\nThen decode the segOP lane from the raw tx hex:\n"
+            "> bitcoin-cli getrawtransaction <txid> false\n"
+            "> bitcoin-cli decodesegop \"<rawtxhex>\"\n"
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+        {
+            const std::string hex = request.params[0].get_str();
+
+            CMutableTransaction mtx;
+            if (!DecodeHexTx(mtx, hex, /*try_no_witness=*/true, /*try_witness=*/true)) {
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+            }
+
+            UniValue result(UniValue::VOBJ);
+
+            if (mtx.segop_payload.IsNull()) {
+                // Plain transaction: just signal absence.
+                result.pushKV("has_segop", false);
+                return result;
+            }
+
+            // segOP present: expose header + TLV breakdown
+            result.pushKV("has_segop", true);
+            result.pushKV("version", (int)mtx.segop_payload.version);
+            result.pushKV("size", (uint64_t)mtx.segop_payload.data.size());
+            result.pushKV("hex", HexStr(mtx.segop_payload.data));
+
+            UniValue tlv = DecodeSegopTlv(mtx.segop_payload);
+            if (!tlv.isNull() && tlv.size() > 0) {
+                result.pushKV("tlv", tlv);
+            }
+
+            return result;
+        }
+    };
+}
+
+
+//////////////////
 static RPCHelpMan createsegoptx()
 {
     return RPCHelpMan{
@@ -545,6 +727,60 @@ static RPCHelpMan createsegoptx()
     };
 }
 
+
+static RPCHelpMan segopbuildp2sop()
+{
+    return RPCHelpMan{
+        "segopbuildp2sop",
+        "Given a segOP payload (hex), compute the P2SOP commitment data.\n"
+        "The returned hex is \"534f50 || SHA256(payload)\" and is intended to be used\n"
+        "as the `data` field in an OP_RETURN output via createrawtransaction.\n",
+        {
+            {"payload", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+             "Hex-encoded segOP payload bytes"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::STR_HEX, "data",
+                 "Hex string to use in a `{\"data\":\"...\"}` output for createrawtransaction"},
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("segopbuildp2sop", "\"01020304\"") +
+            HelpExampleRpc("segopbuildp2sop", "\"01020304\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+        {
+            const std::string payload_hex = request.params[0].get_str();
+            if (!IsHex(payload_hex)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                                   "payload must be hex-encoded");
+            }
+
+            // segOP payload bytes
+            const std::vector<unsigned char> payload = ParseHex(payload_hex);
+
+            // SHA256(payload)
+            unsigned char hash[CSHA256::OUTPUT_SIZE];
+            CSHA256()
+                .Write(payload.data(), payload.size())
+                .Finalize(hash);
+
+            // Build SOP || hash (53 4f 50 + 32-byte hash)
+            std::vector<unsigned char> data;
+            data.reserve(3 + CSHA256::OUTPUT_SIZE);
+            data.push_back(0x53); // 'S'
+            data.push_back(0x4f); // 'O'
+            data.push_back(0x50); // 'P'
+            data.insert(data.end(), hash, hash + CSHA256::OUTPUT_SIZE);
+
+            UniValue result(UniValue::VOBJ);
+            result.pushKV("data", HexStr(data));
+            return result;
+        }
+    };
+}
 
 static RPCHelpMan decodescript()
 {
@@ -2179,7 +2415,9 @@ void RegisterRawTransactionRPCCommands(CRPCTable& t)
         {"rawtransactions", &getrawtransaction},
         {"rawtransactions", &createrawtransaction},
         {"rawtransactions", &decoderawtransaction},
+        { "rawtransactions", &decodesegop}, //segOP
         {"rawtransactions", &createsegoptx},  //segOP
+        {"rawtransactions", &segopbuildp2sop}, //segOP
         {"rawtransactions", &decodescript},
         {"rawtransactions", &combinerawtransaction},
         {"rawtransactions", &signrawtransactionwithkey},

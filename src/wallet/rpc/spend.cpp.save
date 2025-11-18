@@ -1,4 +1,3 @@
-// Copyright (c) 2025 - Defwnwycke - segOP
 // Copyright (c) 2011-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -240,153 +239,58 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
     }
 }
 
-static bool BuildSegopPayloadFromRequest(
-    const std::string& user_payload,
-    const UniValue& options,
-    CSegopPayload& out,
-    std::string& error_out)
+// Build a CSegopPayload from the RPC "payload" string and "options" object.
+static bool BuildSegopPayloadFromRequest(const std::string& user_payload,
+                                         const UniValue& options,
+                                         CSegopPayload& out_segop,
+                                         std::string& out_error)
 {
-    error_out.clear();
+    out_error.clear();
+    out_segop.SetNull();
 
-    // 1. Determine segOP version
-    uint8_t version = CSegopPayload::SEGOP_VERSION; // default
-    if (options.exists("version")) {
-        const UniValue& v = options["version"];
-        if (!v.isNum()) {
-            error_out = "\"version\" must be a number in [1,255]";
-            return false;
-        }
-        const int vi = v.getInt<int>();
-        if (vi < 1 || vi > 255) {
-            error_out = "\"version\" must be in [1,255]";
-            return false;
-        }
-        version = static_cast<uint8_t>(vi);
-    }
-
-    // 2. Determine encoding
+    // encoding: "text" (default) or "hex"
     std::string encoding = "text";
     if (options.exists("encoding")) {
-        const UniValue& e = options["encoding"];
-        if (!e.isStr()) {
-            error_out = "\"encoding\" must be a string";
-            return false;
-        }
-        encoding = e.get_str();
+        encoding = options["encoding"].get_str();
     }
 
-    // 3. Build TLV payload bytes
-    std::vector<unsigned char> segop_data;
+    // version: default 1
+    uint8_t version = 1;
+    if (options.exists("version")) {
+        const int v = options["version"].getInt<int>();
+        if (v < 0 || v > 255) {
+            out_error = "segOP version must be between 0 and 255";
+            return false;
+        }
+        version = static_cast<uint8_t>(v);
+    }
+
+    std::vector<unsigned char> data;
 
     if (encoding == "text") {
-        // Single TEXT_UTF8 TLV
-        segop_data = BuildSegopTextTlv(user_payload);
-
-    } else if (encoding == "text_multi") {
-        // Multi-TLV TEXT sequence, source is options["texts"] array
-        if (!options.exists("texts")) {
-            error_out = "\"texts\" array is required when encoding=\\\"text_multi\\\"";
-            return false;
-        }
-        const UniValue& arr = options["texts"];
-        if (!arr.isArray()) {
-            error_out = "\"texts\" must be an array of strings";
-            return false;
-        }
-        if (arr.size() == 0) {
-            error_out = "\"texts\" array must not be empty";
-            return false;
-        }
-
-        std::vector<std::string> texts;
-        texts.reserve(arr.size());
-        for (unsigned int i = 0; i < arr.size(); ++i) {
-            const UniValue& v = arr[i];
-            if (!v.isStr()) {
-                error_out = "\"texts\" array entries must all be strings";
-                return false;
-            }
-            texts.push_back(v.get_str());
-        }
-
-        segop_data = BuildSegopTextTlvMulti(texts);
-
-    } else if (encoding == "json") {
-        // JSON_UTF8 TLV (no consensus-level JSON validation)
-        std::string json_str;
-
-        if (options.exists("data")) {
-            const UniValue& d = options["data"];
-            if (d.isStr()) {
-                // Caller gave us a raw JSON string
-                json_str = d.get_str();
-            } else {
-                // Any other UniValue → compact JSON string
-                json_str = d.write();
-            }
-        } else {
-            // Fallback: use the user_payload (3rd arg) as JSON text
-            json_str = user_payload;
-        }
-
-        if (json_str.empty()) {
-            error_out = "JSON encoding requires non-empty \"data\" or payload string";
-            return false;
-        }
-
-        segop_data = BuildSegopJsonTlv(json_str);
-
-    } else if (encoding == "blob") {
-        // BINARY_BLOB TLV from options["data_hex"]
-        if (!options.exists("data_hex")) {
-            error_out = "\"data_hex\" is required when encoding=\\\"blob\\\"";
-            return false;
-        }
-        const UniValue& d = options["data_hex"];
-        if (!d.isStr()) {
-            error_out = "\"data_hex\" must be a hex string";
-            return false;
-        }
-
-        const std::string hex = d.get_str();
-        if (!IsHex(hex)) {
-            error_out = "\"data_hex\" is not valid hex";
-            return false;
-        }
-
-        std::vector<unsigned char> raw = ParseHex(hex);
-        segop_data = BuildSegopBlobTlv(raw);
-
+        // Simple TLV encoding for text (see segop.cpp)
+        data = BuildSegopTextTlv(user_payload);
     } else if (encoding == "hex") {
-        // Backwards-compatible: use the payload string as hex
         if (!IsHex(user_payload)) {
-            error_out = "Payload is not valid hex";
+            out_error = "segOP payload is not valid hex";
             return false;
         }
-        std::vector<unsigned char> raw = ParseHex(user_payload);
-        segop_data = BuildSegopBlobTlv(raw);
-
+        data = ParseHex(user_payload);
     } else {
-        error_out = "Unsupported segOP encoding";
+        out_error = "Unsupported segOP encoding: " + encoding;
         return false;
     }
 
-
-    // 4. Populate CSegopPayload
-    out.SetNull();
-    out.version = version;
-    out.data    = std::move(segop_data);
-
-    // 5. Size + TLV sanity checks (match consensus helpers)
-    if (out.TooLarge()) {
-        error_out = "segOP payload too large";
-        return false;
-    }
-    if (!SegopIsValidTLV(out.data)) {
-        error_out = "segOP TLV payload is not well-formed";
+    // Size bound must match consensus rule in tx_check.cpp
+    if (data.size() > CSegopPayload::MAX_SEGOP_PAYLOAD_SIZE) {
+        out_error = strprintf("segOP payload too large (%u bytes, max %u)",
+                              static_cast<unsigned int>(data.size()),
+                              static_cast<unsigned int>(CSegopPayload::MAX_SEGOP_PAYLOAD_SIZE));
         return false;
     }
 
+    out_segop.version = version;
+    out_segop.data    = std::move(data);
     return true;
 }
 
@@ -501,7 +405,6 @@ RPCHelpMan sendtoaddress()
     };
 }
 /////////////
-
 RPCHelpMan segopsend()
 {
     return RPCHelpMan{
@@ -518,26 +421,20 @@ RPCHelpMan segopsend()
              "The amount in " + CURRENCY_UNIT + " to send. eg 0.1"},
             {"payload", RPCArg::Type::STR,    RPCArg::Optional::NO,
              "segOP payload as a string. Interpretation is controlled by \"options.encoding\"."},
-            {"options", RPCArg::Type::OBJ,    RPCArg::Optional::OMITTED,
+                        {"options", RPCArg::Type::OBJ,    RPCArg::Optional::OMITTED,
              "Optional JSON object to modify segOP behaviour:\n"
-             "  \"encoding\" (string): \"text\" (default), \"text_multi\", \"json\" or \"hex\".\n"
+             "  \"encoding\" (string): \"text\" (default) or \"hex\".\n"
              "  \"version\"  (number): segOP version 1-255 (default 1).\n"
              "  \"p2sop\"    (bool):   Attach P2SOP commitment output (default true).\n"
-             "  \"texts\"    (array):  For encoding=\"text_multi\", array of strings → multiple 0x01 TLVs.\n"
              "  \"subtractfeefromamount\" (bool): Subtract fee from the send amount.\n"
              "  \"replaceable\" (bool): Make the transaction BIP125 replaceable.",
              {
                  {"encoding", RPCArg::Type::STR, RPCArg::Optional::OMITTED,
-                  "Payload encoding: \"text\" (default), \"text_multi\", \"json\" or \"hex\"."},
+                  "Payload encoding: \"text\" (default) or \"hex\"."},
                  {"version", RPCArg::Type::NUM, RPCArg::Optional::OMITTED,
                   "segOP version 1-255 (default 1)."},
                  {"p2sop", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
                   "Attach a P2SOP commitment output (default true)."},
-                 {"texts", RPCArg::Type::ARR, RPCArg::Optional::OMITTED,
-                  "For encoding=\"text_multi\": array of UTF-8 strings (each becomes a 0x01 TLV).",
-                  {
-                      {"", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "UTF-8 string element"},
-                  }},
                  {"subtractfeefromamount", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
                   "Subtract the fee from the send amount."},
                  {"replaceable", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
@@ -565,11 +462,7 @@ RPCHelpMan segopsend()
             + HelpExampleCli("segopsend",
                 "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"segOP TLV test payload\" "
                 "'{\"encoding\":\"text\",\"version\":1,\"p2sop\":true}'") +
-            "\nSend 0.1 BTC with multiple TEXT TLVs in one segOP payload:\n"
-            + HelpExampleCli("segopsend",
-                "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"ignored\" "
-                "'{\"encoding\":\"text_multi\",\"texts\":[\"first\",\"second\"],\"version\":1,\"p2sop\":true}'") +
-            "\nSend 0.1 BTC with a hex-encoded segOP blob payload, BIP125-replaceable:\n"
+            "\nSend 0.1 BTC with a hex-encoded segOP payload, BIP125-replaceable:\n"
             + HelpExampleCli("segopsend",
                 "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"534754455354\" "
                 "'{\"encoding\":\"hex\",\"replaceable\":true}'")
@@ -606,14 +499,14 @@ RPCHelpMan segopsend()
             if (!IsValidDestination(dest)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address: " + dest_str);
             }
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-             // Build and validate segOP payload (version + TLVs) via the shared helper.
+
+            // Build segOP payload from user string + options
             CSegopPayload segop_payload;
             std::string segop_error;
             if (!BuildSegopPayloadFromRequest(payload, options, segop_payload, segop_error)) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, segop_error);
             }
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             // p2sop flag – must be true in segOP v1
             bool use_p2sop = true;
             if (options.exists("p2sop")) {
@@ -639,7 +532,7 @@ RPCHelpMan segopsend()
             // Build recipients vector (addresses + amounts) using the same machinery
             // as sendtoaddress, so FundTransaction can calculate the fee correctly.
             UniValue address_amounts(UniValue::VOBJ);
-            address_amounts.pushKV(dest_str, request.params[1]); // same JSON amount we already parsed
+            address_amounts.pushKV(dest_str, request.params[1]); // same amount we already parsed
 
             std::set<int> sffo_set;
             if (subtract_fee) {
@@ -700,7 +593,6 @@ RPCHelpMan segopsend()
         }
     };
 }
-
 
 ////////////////
 RPCHelpMan sendmany()
