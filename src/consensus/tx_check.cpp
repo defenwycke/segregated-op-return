@@ -43,25 +43,29 @@
 // Helpers for detecting and matching P2SOP outputs
 // -----------------------------------------------------------------------------
 
-/** Return true if the given scriptPubKey looks like *any* P2SOP output
- *  (regardless of which commitment it carries).
+/**
+ * Return true if the given scriptPubKey looks like *any* P2SOP output
+ * (regardless of which commitment it carries).
  *
- *  Format we match:
- *      OP_RETURN <len> "P2SOP" ...
- *  where:
- *      - len >= 5 (enough to hold "P2SOP")
+ * Format we match:
+ *      OP_RETURN <push_len> "P2SOP" ...
+ * where:
+ *      - push_len >= 5 (enough to hold "P2SOP")
  */
 static bool ScriptHasP2SOPPrefix(const CScript& script)
 {
-    if (script.size() < 1 + 1 + 5) return false; // OP_RETURN + len + "P2SOP"
+    // Need: OP_RETURN + 1-byte push opcode + at least 5 bytes of data.
+    if (script.size() < 1 + 1 + 5) return false;
 
     if (script[0] != OP_RETURN) return false;
     const unsigned char push_len = static_cast<unsigned char>(script[1]);
 
-    // Need at least 5 bytes of data for "P2SOP"
+    // Need at least 5 bytes of pushed data for "P2SOP".
     if (push_len < 5) return false;
 
-    // script structure: OP_RETURN [len] [len bytes of data...]
+    // script layout: [0] = OP_RETURN
+    //                [1] = push_len
+    //                [2..] = data bytes
     // We only check the first 5 data bytes for the ASCII tag.
     if (script[2] != 'P') return false;
     if (script[3] != '2') return false;
@@ -102,7 +106,7 @@ static bool TxHasExactlyOneMatchingP2SOP(const CTransaction& tx,
                                          const std::vector<unsigned char>& expected_blob)
 {
     if (expected_blob.size() < 5) {
-        // Should never happen; P2SOP tag alone is 5 bytes.
+        // Should never happen; "P2SOP" alone is 5 bytes.
         return false;
     }
 
@@ -123,17 +127,16 @@ static bool TxHasExactlyOneMatchingP2SOP(const CTransaction& tx,
 
         // Data length must match expected_blob size.
         if (push_len != expected_blob.size()) {
-            // This is a P2SOP-looking output, but with the wrong length.
-            // That is not allowed when segOP is present.
+            // P2SOP-looking output with different length: forbidden.
             return false;
         }
 
         if (script.size() != 1 + 1 + expected_blob.size()) {
-            // Malformed script length relative to push_len; also invalid.
+            // Malformed script relative to push_len.
             return false;
         }
 
-        // Compare the data bytes directly to expected_blob.
+        // Compare data bytes directly with expected_blob.
         const bool equal = std::equal(
             expected_blob.begin(),
             expected_blob.end(),
@@ -141,8 +144,7 @@ static bool TxHasExactlyOneMatchingP2SOP(const CTransaction& tx,
         );
 
         if (!equal) {
-            // A P2SOP-looking output exists but commits to the wrong blob.
-            // Invalid for segOP-bearing transactions.
+            // P2SOP-looking output, but wrong commitment.
             return false;
         }
 
@@ -170,8 +172,7 @@ static bool TxHasExactlyOneMatchingP2SOP(const CTransaction& tx,
  *       * version must match CSegopPayload::SEGOP_VERSION
  *       * size must not exceed the spec cap
  *       * TLV structure must be valid
- *       * there must be exactly one P2SOP output whose data matches
- *         "P2SOP" || TAGGED_HASH("segop:commitment", segop_payload)
+ *       * segOP ↔ P2SOP 1:1 coupling must hold (exactly one correct P2SOP)
  *
  *   - if NO segOP payload is present:
  *       * there must be NO P2SOP outputs at all.
@@ -200,7 +201,7 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
 
     if (has_segop) {
         // ---------------------------------------------------------------------
-        // segOP present: enforce payload, TLV, and P2SOP coupling.
+        // segOP present: enforce payload version, size, TLV structure, and 1:1 coupling.
         // ---------------------------------------------------------------------
 
         // Version enforcement (segOP v1 only for now).
@@ -208,31 +209,25 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-segop-version");
         }
 
-        // 1) Size cap (prototype / spec value: 64 KiB).
-        static constexpr unsigned int MAX_SEGOP_PAYLOAD_SIZE = 64000;
-        if (tx.segop_payload.data.size() > MAX_SEGOP_PAYLOAD_SIZE) {
+        // Size cap (from segop.h / spec).
+        if (tx.segop_payload.TooLarge()) {
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-segop-toolarge");
         }
 
-        // 2) TLV well-formedness: [type(1)][len(1)][value(len)] repeated; exact end.
+        // TLV well-formedness: [type(1)][len(varint)][value(len)] repeated; exact end.
         if (!SegopIsValidTLV(tx.segop_payload.data)) {
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-segop-tlv");
         }
 
-        // 3) Build the expected P2SOP blob according to the spec:
-        //      P2SOP_blob = "P2SOP" || TAGGED_HASH("segop:commitment", payload)
+        // Build the expected P2SOP blob according to the spec:
+        //   P2SOP_blob = "P2SOP" || TAGGED_HASH("segop:commitment", segop_payload_bytes)
         //
-        //    and require the transaction to contain *exactly one* OP_RETURN
-        //    output whose pushed data exactly equals this blob, with no
-        //    additional P2SOP-looking outputs.
+        // segop_payload_bytes here are exactly tx.segop_payload.data (TLV bytes),
+        // not including marker or version.
         const std::vector<unsigned char> expected_p2sop_blob =
             BuildSegopCommitmentBlob(tx.segop_payload.data);
 
         if (!TxHasExactlyOneMatchingP2SOP(tx, expected_p2sop_blob)) {
-            // Either:
-            //  - no P2SOP found,
-            //  - more than one P2SOP,
-            //  - or a P2SOP is present but its commitment does not match.
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-segop-no-p2sop");
         }
     } else {
@@ -240,7 +235,8 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
         // No segOP payload: P2SOP must not be present at all.
         // ---------------------------------------------------------------------
         if (TxHasAnyP2SOP(tx)) {
-            return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-segop-p2sop-without-segop");
+            return state.Invalid(TxValidationResult::TX_CONSENSUS,
+                                 "bad-txns-segop-p2sop-without-segop");
         }
     }
 

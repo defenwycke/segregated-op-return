@@ -17,6 +17,7 @@
 #include <hash.h>
 #include <span.h>   // MakeUCharSpan
 #include <span>     // std::span, std::as_bytes
+#include <algorithm>
 
 /**
  * SegOP payload carried in the extended transaction serialization.
@@ -423,5 +424,6 @@ inline std::vector<unsigned char> BuildSegopCommitmentBlob(const std::vector<uns
 
     return blob;
 }
+
 
 #endif // BITCOIN_SEGOP_SEGOP_H

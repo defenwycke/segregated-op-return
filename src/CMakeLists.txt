@@ -173,6 +173,8 @@ if(ENABLE_WALLET)
   endif()
 endif()
 
+# segOP module
+add_subdirectory(segop)
 
 # P2P and RPC server functionality used by `bitcoind` and `bitcoin-qt` executables.
 add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
@@ -272,6 +274,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   $<$<NOT:$<TARGET_EXISTS:bitcoin_wallet>>:dummywallet.cpp>
 )
 target_link_libraries(bitcoin_node
+  PUBLIC
+    segop
   PRIVATE
     core_interface
     bitcoin_common
@@ -341,7 +345,6 @@ if(ENABLE_IPC AND BUILD_TESTS)
     add_dependencies(bitcoin_ipc_test bitcoin_ipc_headers)
 endif()
 
-
 add_library(bitcoin_cli STATIC EXCLUDE_FROM_ALL
   compat/stdin.cpp
   rpc/client.cpp
@@ -351,7 +354,6 @@ target_link_libraries(bitcoin_cli
     core_interface
     univalue
 )
-
 
 # Bitcoin Core RPC client
 if(BUILD_CLI)
@@ -369,7 +371,6 @@ if(BUILD_CLI)
   install_binary_component(bitcoin-cli HAS_MANPAGE)
 endif()
 
-
 if(BUILD_TX)
   add_executable(bitcoin-tx bitcoin-tx.cpp)
   add_windows_resources(bitcoin-tx bitcoin-tx-res.rc)
@@ -383,7 +384,6 @@ if(BUILD_TX)
   install_binary_component(bitcoin-tx HAS_MANPAGE)
 endif()
 
-
 if(BUILD_UTIL)
   add_executable(bitcoin-util bitcoin-util.cpp)
   add_windows_resources(bitcoin-util bitcoin-util-res.rc)
@@ -396,11 +396,9 @@ if(BUILD_UTIL)
   install_binary_component(bitcoin-util HAS_MANPAGE)
 endif()
 
-
 if(BUILD_GUI)
   add_subdirectory(qt)
 endif()
-
 
 if(BUILD_KERNEL_LIB)
   add_subdirectory(kernel)
@@ -427,7 +425,6 @@ if(BUILD_UTIL_CHAINSTATE)
   install_binary_component(bitcoin-chainstate INTERNAL)
 endif()
 
-
 add_subdirectory(test/util)
 if(BUILD_BENCH)
   add_subdirectory(bench)
@@ -440,4 +437,3 @@ endif()
 if(BUILD_FUZZ_BINARY)
   add_subdirectory(test/fuzz)
 endif()
-add_subdirectory(segop)

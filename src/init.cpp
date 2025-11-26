@@ -69,6 +69,8 @@
 #include <rpc/util.h>
 #include <scheduler.h>
 #include <script/sigcache.h>
+#include <segop/segop.h>
+#include <segop/segop_prune.h>
 #include <sync.h>
 #include <torcontrol.h>
 #include <txdb.h>
@@ -519,6 +521,59 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
             "(default: 0 = disable pruning blocks, 1 = allow manual pruning via RPC, >=%u = automatically prune block files to stay under the specified target size in MiB)", MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-reindex", "If enabled, wipe chain state and block index, and rebuild them from blk*.dat files on disk. Also wipe and rebuild other optional indexes that are active. If an assumeutxo snapshot was loaded, its chainstate will be wiped as well. The snapshot can then be reloaded via RPC.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+
+    ///
+    // segOP pruning & retention (policy, non-consensus)
+    // segOP pruning & retention
+    argsman.AddArg(
+        "-segopprune",
+        _("Enable segOP payload pruning in RPC responses. When enabled, "
+          "segOP payloads older than the effective retention window "
+          "E = max(W, R) are treated as pruned and only their P2SOP "
+          "commitments are returned."),
+        ArgsManager::ALLOW_ANY,
+        OptionsCategory::OPTIONS);
+
+    argsman.AddArg(
+        "-segopvalidationwindow=<n>",
+        strprintf(
+            "%s (default: %u, minimum: %u, maximum: %u)",
+            _("segOP Validation Window W in blocks. Blocks older than "
+              "tip-W may drop segOP lane data from disk, but segOP "
+              "payloads are still fully validated at admission time."),
+            segop::DEFAULT_SEGOP_VALIDATION_WINDOW,
+            segop::MIN_SEGOP_VALIDATION_WINDOW,
+            segop::MAX_SEGOP_VALIDATION_WINDOW),
+        ArgsManager::ALLOW_ANY,
+        OptionsCategory::OPTIONS);
+
+    argsman.AddArg(
+        "-segoparchivewindow=<n>",
+        strprintf(
+            "%s (default: %u, minimum: %u, maximum: %u)",
+            _("segOP Archival Window A in blocks. Nodes retaining a larger "
+              "archival window keep segOP lane data for tip-A blocks "
+              "available for fast historical queries."),
+            segop::DEFAULT_SEGOP_VALIDATION_WINDOW,
+            segop::MIN_SEGOP_VALIDATION_WINDOW,
+            segop::MAX_SEGOP_VALIDATION_WINDOW),
+        ArgsManager::ALLOW_ANY,
+        OptionsCategory::OPTIONS);
+
+    argsman.AddArg(
+        "-segopoperatorwindow=<n>",
+        strprintf(
+            "%s (default: %u, minimum: %u, maximum: %u)",
+            _("Operator Retention Window R in blocks. Local policy window for "
+              "keeping segOP lane data beyond the archival window; does not "
+              "affect consensus."),
+            segop::DEFAULT_SEGOP_VALIDATION_WINDOW,
+            segop::MIN_SEGOP_VALIDATION_WINDOW,
+            segop::MAX_SEGOP_VALIDATION_WINDOW),
+        ArgsManager::ALLOW_ANY,
+        OptionsCategory::OPTIONS);
+    ///
+
     argsman.AddArg("-reindex-chainstate", "If enabled, wipe chain state, and rebuild it from blk*.dat files on disk. If an assumeutxo snapshot was loaded, its chainstate will be wiped as well. The snapshot can then be reloaded via RPC.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-settings=<file>", strprintf("Specify path to dynamic settings data file. Can be disabled with -nosettings. File is written at runtime and not meant to be edited by users (use %s instead for custom settings). Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME, BITCOIN_SETTINGS_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #if HAVE_SYSTEM
@@ -586,7 +641,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-seednode=<ip>", "Connect to a node to retrieve peer addresses, and disconnect. This option can be specified multiple times to connect to multiple nodes. During startup, seednodes will be tried before dnsseeds.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-networkactive", "Enable all P2P network activity (default: 1). Can be changed by the setnetworkactive RPC command", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-timeout=<n>", strprintf("Specify socket connection timeout in milliseconds. If an initial attempt to connect is unsuccessful after this amount of time, drop it (minimum: 1, default: %d)", DEFAULT_CONNECT_TIMEOUT), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
-    argsman.AddArg("-peertimeout=<n>", strprintf("Specify a p2p connection timeout delay in seconds. After connecting to a peer, wait this amount of time before considering disconnection based on inactivity (minimum: 1, default: %d)", DEFAULT_PEER_CONNECT_TIMEOUT), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-peertimeout=<n>", strprintf("Specify a p2p connection timeout delay in seconds. After connecting to a peer, wait this amount of time before considering disconnection based on inactivity (minimum: 1, default: %d)", DEFAULT_PEER_CONNECT_TIMEOUT), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-torcontrol=<ip>:<port>", strprintf("Tor control host and port to use if onion listening enabled (default: %s). If no port is specified, the default port of %i will be used.", DEFAULT_TOR_CONTROL, DEFAULT_TOR_CONTROL_PORT), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-torpassword=<pass>", "Tor control port password (default: empty)", ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::CONNECTION);
     argsman.AddArg("-natpmp", strprintf("Use PCP or NAT-PMP to map the listening port (default: %u)", DEFAULT_NATPMP), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
@@ -1362,6 +1417,21 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     auto opt_max_upload = ParseByteUnits(args.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET), ByteUnit::M);
     if (!opt_max_upload) {
         return InitError(strprintf(_("Unable to parse -maxuploadtarget: '%s'"), args.GetArg("-maxuploadtarget", "")));
+    }
+
+    // segOP: initialise pruning / retention policy (view-layer, non-consensus)
+    {
+        const bool segop_prune_enabled = args.GetBoolArg("-segopprune", false);
+
+        const int validation_w = args.GetIntArg(
+            "-segopvalidationwindow", segop::DEFAULT_SEGOP_VALIDATION_WINDOW);
+        const int archive_w = args.GetIntArg(
+            "-segoparchivewindow", segop::DEFAULT_SEGOP_ARCHIVE_WINDOW);
+        const int operator_w = args.GetIntArg(
+            "-segopoperatorwindow", segop::DEFAULT_SEGOP_OPERATOR_WINDOW);
+
+        // Signature: InitPrunePolicy(bool enabled, int validation_w, int archive_w, int operator_w)
+        segop::InitPrunePolicy(segop_prune_enabled, validation_w, archive_w, operator_w);
     }
 
     // ********************************************************* Step 4a: application initialization

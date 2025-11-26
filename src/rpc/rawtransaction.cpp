@@ -33,6 +33,7 @@
 #include <script/sign.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
+#include <segop/segop_prune.h>
 #include <span.h>
 #include <uint256.h>
 #include <undo.h>
@@ -61,15 +62,14 @@ using node::PSBTAnalysis;
 static constexpr decltype(CTransaction::version) DEFAULT_RAWTX_VERSION{CTransaction::CURRENT_VERSION};
 
 static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry,
-                     Chainstate& active_chainstate, const CTxUndo* txundo = nullptr,
+                     Chainstate& active_chainstate,
+                     const CTxUndo* txundo = nullptr,
                      TxVerbosity verbosity = TxVerbosity::SHOW_DETAILS)
+
 {
     CHECK_NONFATAL(verbosity >= TxVerbosity::SHOW_DETAILS);
-    // Call into TxToUniv() in bitcoin-common to decode the transaction hex.
-    //
-    // Blockchain contextual information (confirmations and blocktime) is not
-    // available to code in bitcoin-common, so we query them here and push the
-    // data into the returned UniValue.
+
+    // Base transaction → JSON (includes segop object if present)
     TxToUniv(tx, /*block_hash=*/uint256(), entry, /*include_hex=*/true, txundo, verbosity);
 
     if (!hashBlock.IsNull()) {
@@ -79,12 +79,33 @@ static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& 
         const CBlockIndex* pindex = active_chainstate.m_blockman.LookupBlockIndex(hashBlock);
         if (pindex) {
             if (active_chainstate.m_chain.Contains(pindex)) {
-                entry.pushKV("confirmations", 1 + active_chainstate.m_chain.Height() - pindex->nHeight);
+                const int tip_height   = active_chainstate.m_chain.Height();
+                const int block_height = pindex->nHeight;
+
+                entry.pushKV("confirmations", 1 + tip_height - block_height);
                 entry.pushKV("time", pindex->GetBlockTime());
                 entry.pushKV("blocktime", pindex->GetBlockTime());
-            }
-            else
+
+                // -------------------------
+                // segOP pruning hook (RPC)
+                // -------------------------
+                //
+                // segop::InitPrunePolicy(...) was already called in AppInitMain()
+                // using the CLI args. Here we just ask:
+                //  - Is segOP RPC pruning enabled?
+                //  - Is this block past the effective retention window?
+                if (segop::IsPruneEnabled() && !tx.segop_payload.IsNull()) {
+                    if (segop::IsPrunedHeight(tip_height, block_height)) {
+                        UniValue segop_obj(UniValue::VOBJ);
+                        segop_obj.pushKV("pruned", true);
+                        segop_obj.pushKV("version", static_cast<int>(tx.segop_payload.version));
+                        segop_obj.pushKV("size", static_cast<uint64_t>(tx.segop_payload.data.size()));
+                        entry.pushKV("segop", segop_obj);
+                    }
+                }
+            } else {
                 entry.pushKV("confirmations", 0);
+            }
         }
     }
 }

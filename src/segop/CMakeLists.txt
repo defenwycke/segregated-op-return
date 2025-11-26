@@ -1,5 +1,8 @@
 # SegOP module
-add_library(segop STATIC segop.cpp)
+add_library(segop STATIC
+    segop.cpp
+    segop_prune.cpp
+)
 
 # Ensure it’s compiled as C++
 set_target_properties(segop PROPERTIES LINKER_LANGUAGE CXX)

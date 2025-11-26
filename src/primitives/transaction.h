@@ -223,16 +223,30 @@ template<typename Stream, typename TxType>
 void UnserializeTransaction(TxType& tx, Stream& s, const TransactionSerParams& params)
 {
     const bool fAllowWitness = params.allow_witness;
-
     s >> tx.version;
     unsigned char flags = 0;
     tx.vin.clear();
     tx.vout.clear();
+
     /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
     s >> tx.vin;
     if (tx.vin.size() == 0 && fAllowWitness) {
         /* We read a dummy or an empty vin. */
         s >> flags;
+
+        // segOP unified marker/flag validation (spec §3.2 / §4)
+        //
+        // Allowed bits:
+        //   bit 0 (0x01) = witness present
+        //   bit 1 (0x02) = segOP present
+        // Reserved bits:
+        //   bits 2–7 (0x04–0x80) MUST be zero.
+        //
+        // If any reserved bits are set, this transaction is invalid.
+        if (flags & 0xFC) {
+            throw std::ios_base::failure("bad-txns-segop-flag-reserved-bits");
+        }
+
         if (flags != 0) {
             s >> tx.vin;
             s >> tx.vout;
