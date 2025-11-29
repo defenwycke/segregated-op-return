@@ -679,6 +679,14 @@ RPCHelpMan decodesegop()
             result.pushKV("size", (uint64_t)mtx.segop_payload.data.size());
             result.pushKV("hex", HexStr(mtx.segop_payload.data));
 
+            // --- BUDS: derive code & category from segOP TLV payload ---
+            const unsigned char buds_code = SegopExtractBUDSCode(mtx.segop_payload.data);
+            const segop::BUDSCategory buds_cat = SegopClassifyBUDSFromPayload(mtx.segop_payload.data);
+
+            result.pushKV("buds_code", strprintf("0x%02x", buds_code));
+            result.pushKV("buds_category", segop::ToString(buds_cat));
+            // ------------------------------------------------------------
+
             UniValue tlv = DecodeSegopTlv(mtx.segop_payload);
             if (!tlv.isNull() && tlv.size() > 0) {
                 result.pushKV("tlv", tlv);

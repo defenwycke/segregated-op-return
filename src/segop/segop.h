@@ -7,17 +7,19 @@
 
 #include <serialize.h>
 
-#include <cstdint>
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
-#include <limits>
 
 #include <crypto/sha256.h>
 #include <hash.h>
 #include <span.h>   // MakeUCharSpan
 #include <span>     // std::span, std::as_bytes
-#include <algorithm>
+
+#include <segop/buds.h>
 
 /**
  * SegOP payload carried in the extended transaction serialization.
@@ -101,12 +103,13 @@ namespace SegopTlvType {
 
 /*
  * ---------------------------------------------------------------------------
- * segOP helper utilities (wallet / tools side)
+ * segOP helper utilities (wallet / tools / policy side)
  * ---------------------------------------------------------------------------
  *
  * NOTE: These helpers do *not* change consensus on their own. They just
  * construct payloads and commitment blobs that match what consensus already
- * enforces in src/consensus/tx_check.cpp.
+ * enforces in src/consensus/tx_check.cpp, and provide non-consensus helpers
+ * for decoding / classifying payloads (e.g. BUDS).
  */
 
 /**
@@ -425,5 +428,63 @@ inline std::vector<unsigned char> BuildSegopCommitmentBlob(const std::vector<uns
     return blob;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * BUDS helpers on top of segOP TLV
+ * ---------------------------------------------------------------------------
+ *
+ * These are **non-consensus** helpers that interpret the first TLV record
+ * as carrying a BUDS label in the first byte of its *value*:
+ *
+ *   [type][len(varint)][ value[0] = BUDS code ][ ...rest of value... ]
+ *
+ * If parsing fails at any point, we fall back to code 0x00 / UNKNOWN.
+ */
+
+/**
+ * Attempt to extract a BUDS code from the first TLV record's value.
+ *
+ * Returns 0x00 if:
+ *   - the payload is empty,
+ *   - TLV parsing fails, or
+ *   - the first TLV has zero-length value.
+ */
+inline unsigned char SegopExtractBUDSCode(const std::vector<unsigned char>& bytes)
+{
+    if (bytes.empty()) return 0x00;
+
+    size_t i = 0;
+    const size_t n = bytes.size();
+
+    // Need at least a type byte
+    if (n - i < 1) return 0x00;
+    ++i; // skip type
+
+    // Read CompactSize length
+    uint64_t len = 0;
+    if (!SegopReadCompactSize(bytes, i, len)) {
+        return 0x00;
+    }
+
+    if (len == 0) {
+        return 0x00; // no value bytes, no BUDS code
+    }
+
+    if (n - i < static_cast<size_t>(len)) {
+        return 0x00; // malformed TLV
+    }
+
+    // First byte of the value is interpreted as the BUDS code.
+    return bytes[i];
+}
+
+/**
+ * Classify a segOP payload into a BUDS category using segop::ClassifyBUDSCode.
+ */
+inline segop::BUDSCategory SegopClassifyBUDSFromPayload(const std::vector<unsigned char>& bytes)
+{
+    const unsigned char code = SegopExtractBUDSCode(bytes);
+    return segop::ClassifyBUDSCode(code);
+}
 
 #endif // BITCOIN_SEGOP_SEGOP_H

@@ -2,6 +2,7 @@
 add_library(segop STATIC
     segop.cpp
     segop_prune.cpp
+    buds.cpp
 )
 
 # Ensure it’s compiled as C++
