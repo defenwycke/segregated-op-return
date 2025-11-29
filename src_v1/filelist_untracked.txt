@@ -1,6 +1,0 @@
-src/segop/CMakeLists.txt
-src/segop/segop.cpp
-src/segop/segop.h
-src_v1/filelist.txt
-src_v1/filelist_tracked.txt
-src_v1/filelist_untracked.txt
