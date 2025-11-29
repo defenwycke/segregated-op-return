@@ -34,6 +34,6 @@ make -j$(nproc)
 src/bitcoind -regtest -segop=1 ...
 ```
 
-License
+## License
 
 MIT License (same as upstream Bitcoin Core).
