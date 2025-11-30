@@ -6,6 +6,35 @@
 **Date:** November 2025  
 **Status:** Pre-BIP draft (normative spec)  
 
+---
+
+## Contents
+
+- [1. Overview](#1-overview)
+- [2. Key Properties](#2-key-properties)
+- [3. Transaction Wire Layout](#3-transaction-wire-layout)
+- [4. Marker and Flag Definition](#4-marker-and-flag-definition)
+- [5. segOP Section](#5-segop-section)
+- [6. BUDS Structured Tiering & ARBDA Scoring (Draft-1 Extension)](#6-buds-structured-tiering--arbda-scoring-draft-1-extension)
+- [7. IDs and Hashing](#7-ids-and-hashing)
+- [8. Weight and Fees](#8-weight-and-fees)
+- [9. P2SOP – Pay-to-SegOP](#9-p2sop--pay-to-segop)
+- [10. Node Validation, Retention, and Pruning](#10-node-validation-retention-and-pruning)
+- [11. segOP P2P Behaviour and Payload Relay](#11-segop-p2p-behaviour-and-payload-relay)
+- [12. Compatibility Summary](#12-compatibility-summary)
+- [13. Summary](#13-summary)
+
+- [Appendix A — Constants (segOP v1)](#appendix-a--constants-segop-v1)
+- [Appendix B — Future Extensions (Reserved Flags)](#appendix-b--future-extensions-reserved-flags)
+- [Appendix C — Deployment (Suggested)](#appendix-c--deployment-suggested)
+- [Appendix D — Diagrams (Informative)](#appendix-d--diagrams-informative)
+- [Appendix E — segOP Transaction Lifecycle (Informative)](#appendix-e--segop-transaction-lifecycle-informative)
+- [Appendix F — Glossary (Informative)](#appendix-f--glossary-informative)
+- [Appendix G — Worked Validation Example](#appendix-g--worked-validation-example)
+- [Appendix H — Rationale / Design Motivations](#appendix-h--rationale--design-motivations)
+
+---
+
 ## 1. Overview
 
 segOP (Segregated OP_RETURN) introduces a dedicated, prunable data section to Bitcoin transactions, positioned **after SegWit witness data** and **before nLockTime**, fully charged at `4 WU / byte`.
