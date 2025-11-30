@@ -279,8 +279,16 @@ static bool BuildSegopPayloadFromRequest(
     std::vector<unsigned char> segop_data;
 
     if (encoding == "text") {
-        // Single TEXT_UTF8 TLV
-        segop_data = BuildSegopTextTlv(user_payload);
+        // BUDS-structured: Tier = T1_METADATA (0x10), Type = TEXT_NOTE (0x01),
+        // followed by a TEXT_UTF8 TLV containing user_payload.
+        const uint8_t RAW_TIER_T1_METADATA = 0x10;
+        const uint8_t RAW_TYPE_TEXT_NOTE   = 0x01;
+
+        segop_data = BuildSegopBUDSTextPayload(
+            RAW_TIER_T1_METADATA,
+            RAW_TYPE_TEXT_NOTE,
+            user_payload
+        );
 
     } else if (encoding == "text_multi") {
         // Multi-TLV TEXT sequence, source is options["texts"] array

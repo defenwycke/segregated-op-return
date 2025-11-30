@@ -606,6 +606,16 @@ static UniValue DecodeSegopTlv(const CSegopPayload& segop)
             kind = "blob";
         }
 
+        // segOP BUDS markers:
+        // 0xF0 = BUDS Tier marker
+        // 0xF1 = BUDS Data-type marker
+        if (t == 0xF0) {
+            kind = "buds_tier";
+        }
+        if (t == 0xF1) {
+            kind = "buds_type";
+        }
+
         rec.pushKV("kind", kind);
 
         out.push_back(std::move(rec));
@@ -679,13 +689,22 @@ RPCHelpMan decodesegop()
             result.pushKV("size", (uint64_t)mtx.segop_payload.data.size());
             result.pushKV("hex", HexStr(mtx.segop_payload.data));
 
-            // --- BUDS: derive code & category from segOP TLV payload ---
-            const unsigned char buds_code = SegopExtractBUDSCode(mtx.segop_payload.data);
-            const segop::BUDSCategory buds_cat = SegopClassifyBUDSFromPayload(mtx.segop_payload.data);
+            // --- BUDS structured tiering + ARBDA (segOP-local view) ---
+            SegopBUDSInfo buds = SegopExtractBUDSInfo(mtx.segop_payload.data);
 
-            result.pushKV("buds_code", strprintf("0x%02x", buds_code));
-            result.pushKV("buds_category", segop::ToString(buds_cat));
-            // ------------------------------------------------------------
+            result.pushKV("buds_tier_code", strprintf("0x%02x", buds.tier_code));
+            result.pushKV("buds_tier", segop::ToString(buds.tier));
+
+            result.pushKV("buds_type_code", strprintf("0x%02x", buds.type_code));
+            result.pushKV("buds_type", segop::ToString(buds.type));
+
+            result.pushKV("arbda_tier", segop::ToString(buds.arbda));
+
+            if (buds.ambiguous) {
+                result.pushKV("buds_warning", "Multiple conflicting tier markers (AMBIGUOUS)");
+            }
+
+            // TLV breakdown
 
             UniValue tlv = DecodeSegopTlv(mtx.segop_payload);
             if (!tlv.isNull() && tlv.size() > 0) {
@@ -698,7 +717,6 @@ RPCHelpMan decodesegop()
 }
 
 
-//////////////////
 static RPCHelpMan createsegoptx()
 {
     return RPCHelpMan{

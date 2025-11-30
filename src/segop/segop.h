@@ -428,63 +428,163 @@ inline std::vector<unsigned char> BuildSegopCommitmentBlob(const std::vector<uns
     return blob;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * BUDS helpers on top of segOP TLV
- * ---------------------------------------------------------------------------
- *
- * These are **non-consensus** helpers that interpret the first TLV record
- * as carrying a BUDS label in the first byte of its *value*:
- *
- *   [type][len(varint)][ value[0] = BUDS code ][ ...rest of value... ]
- *
- * If parsing fails at any point, we fall back to code 0x00 / UNKNOWN.
- */
+// ---------------------------------------------------------------------------
+// BUDS + ARBDA helpers on top of segOP TLV
+// ---------------------------------------------------------------------------
+
+struct SegopBUDSInfo
+{
+    // Raw codes as found in TLVs (0xff if not present)
+    uint8_t tier_code{0xff};
+    uint8_t type_code{0xff};
+
+    // Decoded enums
+    segop::BUDSTier     tier{segop::BUDSTier::UNSPECIFIED};
+    segop::BUDSDataType type{segop::BUDSDataType::UNSPECIFIED};
+
+    // Presence bitmap for ARBDA computation
+    segop::BUDSTierPresence presence{};
+
+    // Computed ARBDA tier (transaction/payload-level risk)
+    segop::ARBDATier arbda{segop::ARBDATier::T0};
+
+    bool has_tier{false};
+    bool has_type{false};
+    bool ambiguous{false};
+};
 
 /**
- * Attempt to extract a BUDS code from the first TLV record's value.
+ * Extract BUDS tier/type info and ARBDA tier from a segOP TLV payload.
  *
- * Returns 0x00 if:
- *   - the payload is empty,
- *   - TLV parsing fails, or
- *   - the first TLV has zero-length value.
+ * Convention:
+ *   - TLV type 0xF0, len=1 => Tier marker (value[0] = raw tier code).
+ *   - TLV type 0xF1, len=1 => Data-type marker (value[0] = raw type code).
+ *
+ * If multiple 0xF0 TLVs express different tiers, we mark `ambiguous` and set
+ * `tier = AMBIGUOUS`, but ARBDA still applies the conservative rule:
+ * any T3 present anywhere => ARBDA = T3, else T2, else T1, else T0.
+ *
+ * If there are no 0xF0/0xF1 markers, tier/type remain UNSPECIFIED and ARBDA
+ * falls back to T0 (no structured metadata observed in this payload).
  */
-inline unsigned char SegopExtractBUDSCode(const std::vector<unsigned char>& bytes)
+inline SegopBUDSInfo SegopExtractBUDSInfo(const std::vector<unsigned char>& bytes)
 {
-    if (bytes.empty()) return 0x00;
+    SegopBUDSInfo info;
+
+    // No segOP payload at all -> ARBDA sees no metadata, stays at T0.
+    if (bytes.empty()) {
+        info.arbda = segop::ComputeARBDATier(info.presence);
+        return info;
+    }
 
     size_t i = 0;
     const size_t n = bytes.size();
 
-    // Need at least a type byte
-    if (n - i < 1) return 0x00;
-    ++i; // skip type
+    while (i < n) {
+        if (n - i < 1) {
+            break; // truncated
+        }
 
-    // Read CompactSize length
-    uint64_t len = 0;
-    if (!SegopReadCompactSize(bytes, i, len)) {
-        return 0x00;
+        uint8_t tlv_type = bytes[i++];
+
+        uint64_t len = 0;
+        if (!SegopReadCompactSize(bytes, i, len)) {
+            break; // malformed CompactSize -> stop decoding
+        }
+
+        if (n - i < static_cast<size_t>(len)) {
+            break; // overrun -> stop
+        }
+
+        const unsigned char* value_ptr = (len > 0) ? &bytes[i] : nullptr;
+
+        // 0xF0 = Tier marker
+        if (tlv_type == 0xF0 && len >= 1) {
+            uint8_t raw_tier = value_ptr[0];
+            segop::BUDSTier this_tier = segop::DecodeTierCode(raw_tier);
+
+            // Update presence bitmap
+            switch (this_tier) {
+            case segop::BUDSTier::T0_MONETARY:    info.presence.has_t0 = true; break;
+            case segop::BUDSTier::T1_METADATA:    info.presence.has_t1 = true; break;
+            case segop::BUDSTier::T2_OPERATIONAL: info.presence.has_t2 = true; break;
+            case segop::BUDSTier::T3_ARBITRARY:   info.presence.has_t3 = true; break;
+            case segop::BUDSTier::UNSPECIFIED:
+            case segop::BUDSTier::AMBIGUOUS:
+                break;
+            }
+
+            if (!info.has_tier) {
+                info.has_tier = true;
+                info.tier_code = raw_tier;
+                info.tier = this_tier;
+            } else if (this_tier != info.tier) {
+                info.ambiguous = true;
+            }
+        }
+
+        // 0xF1 = Data-type marker
+        if (tlv_type == 0xF1 && len >= 1 && !info.has_type) {
+            uint8_t raw_type = value_ptr[0];
+            info.type_code = raw_type;
+            info.type = segop::DecodeDataTypeCode(info.tier, raw_type);
+            info.has_type = true;
+        }
+
+        // Advance to next TLV
+        i += static_cast<size_t>(len);
     }
 
-    if (len == 0) {
-        return 0x00; // no value bytes, no BUDS code
+    if (info.ambiguous) {
+        info.tier = segop::BUDSTier::AMBIGUOUS;
     }
 
-    if (n - i < static_cast<size_t>(len)) {
-        return 0x00; // malformed TLV
+    // IMPORTANT: segOP payload exists but no tier markers at all
+    // => treat as "unlabelled arbitrary data" for ARBDA purposes.
+    if (!info.has_tier && !bytes.empty()) {
+        info.presence.has_t3 = true;
     }
 
-    // First byte of the value is interpreted as the BUDS code.
-    return bytes[i];
+    // Apply ARBDA rule using the presence bitmap.
+    info.arbda = segop::ComputeARBDATier(info.presence);
+
+    return info;
 }
 
-/**
- * Classify a segOP payload into a BUDS category using segop::ClassifyBUDSCode.
- */
-inline segop::BUDSCategory SegopClassifyBUDSFromPayload(const std::vector<unsigned char>& bytes)
+inline std::vector<unsigned char> BuildSegopBUDSTextPayload(uint8_t raw_tier_code,
+                                                            uint8_t raw_type_code,
+                                                            const std::string& text)
 {
-    const unsigned char code = SegopExtractBUDSCode(bytes);
-    return segop::ClassifyBUDSCode(code);
+    std::vector<SegopTlv> items;
+    items.reserve(3);
+
+    // 1) Tier TLV (0xF0)
+    {
+        SegopTlv t;
+        t.type = 0xF0;
+        t.value = { raw_tier_code };
+        items.push_back(std::move(t));
+    }
+
+    // 2) Type TLV (0xF1)
+    {
+        SegopTlv t;
+        t.type = 0xF1;
+        t.value = { raw_type_code };
+        items.push_back(std::move(t));
+    }
+
+    // 3) Content TLV: TEXT_UTF8 (0x01)
+    {
+        SegopTlv t;
+        t.type = SegopTlvType::TEXT_UTF8;
+        t.value.assign(text.begin(), text.end());
+        items.push_back(std::move(t));
+    }
+
+    return BuildSegopTlvSequence(items);
 }
+
 
 #endif // BITCOIN_SEGOP_SEGOP_H
+
