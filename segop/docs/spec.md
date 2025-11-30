@@ -530,7 +530,8 @@ Nodes and applications MUST treat unknown `type` values as opaque binary bytes.
   - `length` as an integer
   - `value_hex` as hex for the raw bytes.
 
-## 6. Worked Example (SegWit + segOP, flag = 0x03)
+### 5.3 Examples 
+#### 5.3.1 Worked Example (SegWit + segOP, flag = 0x03)
 
 The following is an illustrative (non-signed) transaction showing SegWit and
 segOP together. Hex values are examples only.
@@ -602,11 +603,11 @@ TLV2: 1(type) + 1(len varint) + 4(value)  = 6 bytes
 Total = 24 bytes = segop_len
 ```
 
-### 6.1 Example TLV Structures (Informative)
+#### 5.3.2 Example TLV Structures (Informative)
 
 Below are example TLV layouts illustrating real-world uses.
 
-#### 6.1.1 Example A — One Large TLV (simple apps)
+#### 5.3.3 Example A — One Large TLV (simple apps)
 
 A simple inscription, file, or large proof:
 
@@ -629,7 +630,7 @@ Use cases:
 - Merkleized application blobs
 - ZK-STARK traces
 
-#### 6.1.2 Example B — Metadata + Body
+#### 5.3.4 Example B — Metadata + Body
 
 Payload includes metadata TLV + big content TLV:
 
@@ -647,7 +648,7 @@ TLV 0x10 → “main blob” (64 KB)
 
 This allows light-weight parsers to read type 0x01 (metadata) and skip over the large 0x10 blob without parsing it.
 
-#### 6.1.3 Example C — Multi-component L2 rollup
+#### 5.3.5 Example C — Multi-component L2 rollup
 
 ```
 01 05                <“L2v1”>
@@ -668,7 +669,7 @@ Type  Meaning
 0x20  Actual state delta
 ```
 
-#### 6.1.4 Example D — Vault metadata + auxiliary data
+#### 5.3.6 Example D — Vault metadata + auxiliary data
 
 ```
 01 20   <vault policy blob>
@@ -679,7 +680,7 @@ Type  Meaning
 
 This shows structured, multi-field metadata inside one segOP payload, where each TLV is small but semantically distinct.
 
-#### 6.1.5 Example E — “Envelope + Body” pattern
+#### 5.3.7 Example E — “Envelope + Body” pattern
 
 A TLV envelope describing the content, then a raw TLV containing it:
 
@@ -693,7 +694,7 @@ Here:
 - `0x01` declares the media type.
 - `0x02` carries the actual JSON body.
 
-#### 6.1.6 Example F — Multiple optional extensions
+#### 5.3.8 Example F — Multiple optional extensions
 
 ```
 01 01                <version byte>
@@ -708,6 +709,178 @@ This illustrates:
 - A small fixed “header” region (version / IDs / commitments).
 - A large main blob (0x10).
 - An optional extension TLV (0x11) that higher-layer protocols may or may not understand.
+
+## 6. BUDS Structured Tiering & ARBDA Scoring (Draft-1 Extension)
+
+This section updates the segOP draft-1 specification to include support for:
+
+- **BUDS Tier Markers (T0–T3)**
+- **BUDS Data-Type Markers**
+- **Per-payload ARBDA scoring**
+
+These rules are **non-consensus** and apply only to:
+- segOP-aware nodes  
+- wallet RPC helpers  
+- block template policy  
+- pruning & operator heuristics  
+
+Consensus remains unchanged:  
+**segOP payloads are always arbitrary bytes and remain fully valid on non-segOP nodes.**
+
+---
+
+### 6.1 BUDS Marker TLVs
+
+segOP v1 introduces two optional TLV markers used to classify payload content according to the BUDS registry:
+
+| Marker | Meaning | Value | Length |
+|--------|---------|--------|---------|
+| **0xF0** | BUDS Tier Marker | Tier code (0x00–0x03) or 0x10/0x20 structured classes | 1 byte |
+| **0xF1** | BUDS Data-Type Marker | Type code (text, JSON, L2 anchor, receipt, etc.) | 1 byte |
+
+#### 6.1.1 Tier Codes (0xF0)
+
+```
+0x00  T0_CONSENSUS
+0x10  T1_METADATA
+0x20  T2_OPERATIONAL
+0x30  T3_ARBITRARY
+0xFF  UNSPECIFIED (default when no tier TLV exists)
+```
+
+#### 6.1.2 Data-Type Codes (0xF1)
+Examples (non-exhaustive):
+
+```
+0x01  TEXT_NOTE
+0x02  JSON_METADATA
+0x03  BINARY_BLOB
+0x20  L2_STATE_ANCHOR
+0x21  ROLLUP_BATCH_REF
+0x22  PROOF_REF
+0x23  VAULT_METADATA
+0xFF  UNSPECIFIED
+```
+
+Nodes MUST tolerate unknown or future codes.
+
+---
+
+### 6.2 Placement & Ordering Rules
+
+BUDS markers follow standard segOP TLV structure.  
+They may appear anywhere in the payload, with the following recommendations:
+
+- **Recommended order:**  
+  `0xF0 tier → 0xF1 type → content TLVs`
+
+- **Multiple tier markers:**  
+  Allowed, but marked as **AMBIGUOUS**.
+
+- **Multiple type markers:**  
+  Only the first is authoritative; others ignored.
+
+- **No BUDS markers:**  
+  Payload defaults to:  
+  - Tier = **UNSPECIFIED**  
+  - Type = **UNSPECIFIED**  
+  - ARBDA = **T3**
+
+---
+
+### 6.3 BUDS Extraction Algorithm (Informative)
+
+Nodes implementing BUDS support MUST:
+
+1. Scan segOP payload sequentially.
+2. Track:
+   - First tier marker (if any)
+   - First type marker (if any)
+   - Additional tier markers → set `ambiguous = true`
+3. Build a tier presence bitmap:
+   ```
+   has_t0, has_t1, has_t2, has_t3
+   ```
+4. If **no tier markers** exist but payload is non-empty → `has_t3 = true`.
+
+This extraction is **policy-only** and does not affect consensus.
+
+---
+
+### 6.4 ARBDA: Arbitrary Data Dominance Assessment
+
+ARBDA provides a **transaction-level** risk score based on tier presence.
+
+#### 6.4.1 ARBDA Rule
+
+```
+if has_T3:   ARBDA = T3
+else if has_T2: ARBDA = T2
+else if has_T1: ARBDA = T1
+else:            ARBDA = T0
+```
+
+Interpretation:
+
+- **Any opaque or uncontrolled data dominates the entire payload.**
+- Strict incentives for protocols to use structured tiering.
+- ARBDA is advisory only; no consensus effects.
+
+---
+
+### 6.5 JSON-RPC Exposure (Normative for segOP nodes)
+
+`decodesegop` MUST return:
+
+```
+"buds_tier_code": "0x10",
+"buds_tier": "T1_METADATA",
+"buds_type_code": "0x01",
+"buds_type": "TEXT_NOTE",
+"arbda_tier": "T1",
+```
+
+Plus warnings:
+
+```
+"buds_warning": "Multiple conflicting tier markers (AMBIGUOUS)"
+```
+
+TLV records for markers MUST be decoded as:
+
+```
+{ "type": "0xf0", "kind": "buds_tier", "value_hex": "10" }
+{ "type": "0xf1", "kind": "buds_type", "value_hex": "01" }
+```
+
+---
+
+## 6.6 Backwards Compatibility
+
+- Older segOP nodes (no BUDS support) simply ignore markers.
+- BUDS-aware nodes maintain full interoperability.
+- Payloads containing only TEXT/JSON/BLOB TLVs remain valid.
+
+No behaviour changes occur at consensus level.
+
+---
+
+## 6.7 Rationale
+
+BUDS + ARBDA provide:
+
+- **Predictable structure** for indexing, scanning, pruning, and analysis.
+- **Local policy hooks** for mempool and mining.
+- **Incentives for transparent protocol design.**
+- **Neutral, descriptive classification** that does not block any use case.
+
+segOP remains:
+- Optional  
+- Non-consensus  
+- Backwards-compatible  
+- Prunable  
+
+BUDS merely describes the payload, never restricts it.
 
 ## 7. IDs and Hashing
 
