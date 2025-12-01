@@ -1,0 +1,124 @@
+.wallet-root h2 {
+  margin-top: 0;
+}
+
+.wallet-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1.4fr 1.2fr;
+  gap: 20px;
+}
+
+.wallet-card {
+  background: #111;
+  border-radius: 6px;
+  border: 1px solid #222;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.wallet-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.wallet-card-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.wallet-role {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #222;
+  color: #aaa;
+}
+
+.wallet-row {
+  margin-bottom: 8px;
+}
+
+.wallet-row label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.wallet-mono {
+  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  background: #050505;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #222;
+}
+
+.wallet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wallet-actions button,
+.transfer-actions button,
+.mining-actions button {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #181818;
+  color: #eee;
+  font-size: 12px;
+}
+
+.wallet-actions button:hover,
+.transfer-actions button:hover,
+.mining-actions button:hover {
+  border-color: #ff6600;
+}
+
+.transfer-card,
+.mining-card {
+  background: #111;
+  border-radius: 6px;
+  border: 1px solid #222;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.transfer-row {
+  margin-bottom: 8px;
+}
+
+.transfer-row label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 2px;
+}
+
+.transfer-row input,
+.transfer-row textarea {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #050505;
+  color: #eee;
+  font-size: 12px;
+}
+
+.transfer-row textarea {
+  min-height: 40px;
+  resize: vertical;
+}
+
+.transfer-actions,
+.mining-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}

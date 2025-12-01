@@ -1,0 +1,152 @@
+.sim-root h2 {
+  margin-top: 0;
+}
+
+.sim-layout {
+  display: flex;
+  gap: 24px;
+}
+
+.sim-controls {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.sim-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-controls input,
+.sim-controls select {
+  padding: 4px 6px;
+  background: #111;
+  border: 1px solid #333;
+  color: #eee;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.range-row {
+  margin-top: 4px;
+}
+
+.range-with-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sim-summary {
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #111;
+  border: 1px solid #333;
+}
+
+.sim-visual {
+  flex: 1;
+}
+
+.sim-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.block-strip {
+  display: flex;
+  gap: 1px;
+  height: 70px;
+  padding: 4px;
+  background: #050505;
+  border-radius: 4px;
+  border: 1px solid #222;
+}
+
+.block {
+  flex: 1;
+  border-radius: 2px;
+  background: #151515;
+}
+
+/* Windows (background shading) */
+.block-archive {
+  background: #3a2a2a;
+}
+
+.block-operator {
+  background: #26324b;
+}
+
+.block-validation {
+  background: #234d23;
+}
+
+/* segOP overlay */
+.block-segop {
+  box-shadow: 0 0 4px #ff6600;
+}
+
+/* pruned + reorg overrides */
+.block-pruned {
+  background: #050505;
+  opacity: 0.3;
+}
+
+.block-reorg {
+  outline: 1px solid #ff0000;
+}
+
+/* Legend */
+
+.sim-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.swatch-validation {
+  background: #234d23;
+}
+
+.swatch-operator {
+  background: #26324b;
+}
+
+.swatch-archive {
+  background: #3a2a2a;
+}
+
+.swatch-segop {
+  background: #ff6600;
+}
+
+.swatch-pruned {
+  background: #555555;
+}
+
+.swatch-reorg {
+  background: #ff0000;
+}

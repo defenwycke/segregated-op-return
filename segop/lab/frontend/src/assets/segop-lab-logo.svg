@@ -1,0 +1,18 @@
+<svg width="120" height="32" viewBox="0 0 120 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .text-main { fill: #ff6600; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 700; }
+      .text-sub { fill: #ffffff; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight: 500; }
+      .ghost { fill: none; stroke: #ffffff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+  <!-- Ghost icon on the left -->
+  <g transform="translate(4,6)">
+    <path class="ghost" d="M8 20 L6.5 18.5 5 20 3.5 18.5 2 20 2 9.5C2 6 4.5 3.5 8 3.5C11.5 3.5 14 6 14 9.5L14 20 12.5 18.5 11 20 9.5 18.5 8 20Z" />
+    <circle class="ghost" cx="6.2" cy="9.5" r="0.8" />
+    <circle class="ghost" cx="9.8" cy="9.5" r="0.8" />
+  </g>
+  <!-- Text -->
+  <text class="text-main" x="26" y="20" font-size="14">segOP</text>
+  <text class="text-sub" x="68" y="20" font-size="14">Lab</text>
+</svg>

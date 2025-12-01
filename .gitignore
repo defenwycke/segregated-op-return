@@ -27,3 +27,7 @@ target/
 
 /ci/scratch/
 development/testing/**/*.tar.gz
+segop/lab/frontend/node_modules
+segop/lab/frontend/dist
+segop/lab/frontend/build
+segop/lab/frontend/.env

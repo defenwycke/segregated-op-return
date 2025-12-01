@@ -1,0 +1,48 @@
+.layout-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #222;
+  background: #111;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ff6600;
+}
+
+.logo .lab {
+  color: #ffffff;
+  margin-left: 4px;
+}
+
+.layout-nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav-item {
+  color: #ccc;
+  text-decoration: none;
+  font-size: 14px;
+  padding-bottom: 2px;
+}
+
+.nav-item.active {
+  color: #ff6600;
+  border-bottom: 2px solid #ff6600;
+}
+
+.layout-main {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
