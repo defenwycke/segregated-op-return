@@ -1,0 +1,42 @@
+.segreg-root {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.segreg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.segreg-table th,
+.segreg-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #222;
+  text-align: left;
+}
+
+.segreg-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ff9900;
+  background: #111;
+}
+
+.segreg-code {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.segreg-notes {
+  color: #ccc;
+}
+
+.segreg-footnote {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #888;
+}

@@ -10,17 +10,18 @@
   justify-content: space-between;
   padding: 12px 20px;
   border-bottom: 1px solid #222;
-  background: #111;
+  /* BUDS-style orange header strip */
+  background: linear-gradient(90deg, #ff9900, #ff7a00);
 }
 
 .logo {
   font-size: 20px;
   font-weight: 700;
-  color: #ff6600;
+  color: #111;         /* dark text on orange */
 }
 
 .logo .lab {
-  color: #ffffff;
+  color: #111;
   margin-left: 4px;
 }
 
@@ -30,15 +31,15 @@
 }
 
 .nav-item {
-  color: #ccc;
+  color: #111;         /* dark text so it’s readable */
   text-decoration: none;
   font-size: 14px;
   padding-bottom: 2px;
 }
 
 .nav-item.active {
-  color: #ff6600;
-  border-bottom: 2px solid #ff6600;
+  color: #000;
+  border-bottom: 2px solid #000;
 }
 
 .layout-main {

@@ -1,0 +1,27 @@
+{
+  "has_segop": true,
+  "version": 1,
+  "size": 15,
+  "hex": "0105666972737401067365636f6e64",
+  "buds_tier_code": "0xff",
+  "buds_tier": "UNSPECIFIED",
+  "buds_type_code": "0xff",
+  "buds_type": "UNSPECIFIED",
+  "arbda_tier": "T3",
+  "tlv": [
+    {
+      "type": "0x01",
+      "length": 5,
+      "value_hex": "6669727374",
+      "text": "first",
+      "kind": "text"
+    },
+    {
+      "type": "0x01",
+      "length": 6,
+      "value_hex": "7365636f6e64",
+      "text": "second",
+      "kind": "text"
+    }
+  ]
+}

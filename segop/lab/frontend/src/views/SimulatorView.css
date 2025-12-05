@@ -1,152 +1,297 @@
-.sim-root h2 {
-  margin-top: 0;
-}
-
-.sim-layout {
-  display: flex;
-  gap: 24px;
-}
-
-.sim-controls {
-  width: 260px;
+k.sim-root {
+  width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.sim-card {
+  border-radius: 8px;
+  border: 1px solid #222;
+  background: #050505;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sim-card h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #ff9900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sim-intro {
+  margin: 0;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
   gap: 12px;
-  font-size: 13px;
+  margin-top: 6px;
 }
 
-.sim-controls label {
+.sim-col {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
-.sim-controls input,
-.sim-controls select {
-  padding: 4px 6px;
-  background: #111;
-  border: 1px solid #333;
-  color: #eee;
-  border-radius: 4px;
+.sim-col h3 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  color: #ffcc66;
+}
+
+.sim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   font-size: 12px;
 }
 
-.range-row {
+.sim-field label {
+  font-size: 11px;
+  color: #bbb;
+}
+
+.sim-label-note {
+  font-size: 10px;
+  color: #777;
+  margin-left: 4px;
+}
+
+.sim-field input[type="number"] {
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #050505;
+  color: #eee;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.sim-field input:focus {
+  outline: none;
+  border-color: #ff9900;
+}
+
+.sim-checkboxes {
   margin-top: 4px;
 }
 
-.range-with-value {
+.sim-checkbox-row {
+  font-size: 11px;
+  color: #ccc;
+}
+
+/* Horizontal chain bar */
+
+.sim-bar-wrapper {
+  margin-top: 4px;
+}
+
+.sim-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sim-summary {
-  margin-top: 12px;
-  padding: 8px;
-  border-radius: 4px;
-  background: #111;
+  width: 100%;
+  height: 20px;
+  border-radius: 999px;
+  overflow: hidden;
   border: 1px solid #333;
+  background: #050505;
 }
 
-.sim-visual {
-  flex: 1;
+.sim-segment {
+  height: 100%;
 }
 
-.sim-axis-labels {
+/* Colours for windows:
+
+   Validation: bright cyan
+   Operator: magenta
+   Archive: yellow
+   Prunable: dark grey/red
+*/
+
+.sim-validation {
+  background: #00ffff;
+}
+
+.sim-operator {
+  background: #ff00ff;
+}
+
+.sim-archive {
+  background: #ffff00;
+}
+
+.sim-prunable {
+  background: #221010;
+}
+
+.sim-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  color: #999;
-  margin-bottom: 4px;
+  font-size: 10px;
+  color: #888;
+  margin-top: 3px;
 }
-
-.block-strip {
-  display: flex;
-  gap: 1px;
-  height: 70px;
-  padding: 4px;
-  background: #050505;
-  border-radius: 4px;
-  border: 1px solid #222;
-}
-
-.block {
-  flex: 1;
-  border-radius: 2px;
-  background: #151515;
-}
-
-/* Windows (background shading) */
-.block-archive {
-  background: #3a2a2a;
-}
-
-.block-operator {
-  background: #26324b;
-}
-
-.block-validation {
-  background: #234d23;
-}
-
-/* segOP overlay */
-.block-segop {
-  box-shadow: 0 0 4px #ff6600;
-}
-
-/* pruned + reorg overrides */
-.block-pruned {
-  background: #050505;
-  opacity: 0.3;
-}
-
-.block-reorg {
-  outline: 1px solid #ff0000;
-}
-
-/* Legend */
 
 .sim-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
   font-size: 11px;
-  margin-top: 8px;
+  color: #ccc;
+  margin-top: 4px;
 }
 
-.legend-item {
+.sim-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid #444;
+}
+
+.sim-dot.sim-validation {
+  background: #00ffff;
+}
+
+.sim-dot.sim-operator {
+  background: #ff00ff;
+}
+
+.sim-dot.sim-archive {
+  background: #ffff00;
+}
+
+.sim-dot.sim-prunable {
+  background: #221010;
+}
+
+/* Stats */
+
+.sim-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sim-stat {
+  border-radius: 6px;
+  border: 1px solid #222;
+  background: #040404;
+  padding: 6px 8px;
+}
+
+.sim-stat-label {
+  font-size: 10px;
+  color: #888;
+}
+
+.sim-stat-value {
+  font-size: 12px;
+  color: #eee;
+}
+
+/* Mempool summary */
+
+.tier-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  border: 1px solid transparent;
+}
+
+/* Re-use tier colours from Info/Inspector:
+
+   T0 = green, T1 = blue, T2 = orange, T3 = red
+*/
+
+.tier-badge.t0 {
+  background: #103b10;
+  color: #b5ffb5;
+  border-color: #1f7a1f;
+}
+
+.tier-badge.t1 {
+  background: #102c4a;
+  color: #b5d5ff;
+  border-color: #265d9b;
+}
+
+.tier-badge.t2 {
+  background: #4a2b10;
+  color: #ffd6a5;
+  border-color: #b87333;
+}
+
+.tier-badge.t3 {
+  background: #4a1010;
+  color: #ffb5b5;
+  border-color: #993333;
+}
+
+.sim-mempool-summary {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
-.legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+.sim-mempool-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #ccc;
 }
 
-.swatch-validation {
-  background: #234d23;
+.sim-footnote {
+  margin: 6px 0 0 0;
+  font-size: 10px;
+  color: #777;
 }
 
-.swatch-operator {
-  background: #26324b;
+/* Buttons baseline (if we add any later) */
+
+.sim-card button {
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
-.swatch-archive {
-  background: #3a2a2a;
+.sim-card button:hover {
+  border-color: #ff9900;
 }
 
-.swatch-segop {
-  background: #ff6600;
+/* Responsive */
+
+@media (max-width: 1000px) {
+  .sim-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sim-stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-.swatch-pruned {
-  background: #555555;
-}
-
-.swatch-reorg {
-  background: #ff0000;
-}

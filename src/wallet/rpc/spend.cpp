@@ -275,6 +275,17 @@ static bool BuildSegopPayloadFromRequest(
         encoding = e.get_str();
     }
 
+    // 2b. Optional: raw_tlv mode (only meaningful for encoding="hex")
+    bool raw_tlv = false;
+    if (options.exists("raw_tlv")) {
+        const UniValue& r = options["raw_tlv"];
+        if (!r.isBool()) {
+            error_out = "\"raw_tlv\" must be a boolean";
+            return false;
+        }
+        raw_tlv = r.get_bool();
+    }
+
     // 3. Build TLV payload bytes
     std::vector<unsigned char> segop_data;
 
@@ -366,13 +377,23 @@ static bool BuildSegopPayloadFromRequest(
         segop_data = BuildSegopBlobTlv(raw);
 
     } else if (encoding == "hex") {
-        // Backwards-compatible: use the payload string as hex
+        // Hex-encoded payload. If raw_tlv=false (default), wrap as a BLOB TLV.
+        // If raw_tlv=true, interpret the bytes as a complete TLV sequence and
+        // use them as-is in the segOP lane.
         if (!IsHex(user_payload)) {
             error_out = "Payload is not valid hex";
             return false;
         }
+
         std::vector<unsigned char> raw = ParseHex(user_payload);
-        segop_data = BuildSegopBlobTlv(raw);
+
+        if (raw_tlv) {
+            // Raw TLV mode: caller is responsible for providing a valid TLV sequence.
+            segop_data = std::move(raw);
+        } else {
+            // Legacy / convenience mode: treat the bytes as an opaque blob TLV.
+            segop_data = BuildSegopBlobTlv(raw);
+        }
 
     } else {
         error_out = "Unsupported segOP encoding";
@@ -533,7 +554,8 @@ RPCHelpMan segopsend()
              "  \"p2sop\"    (bool):   Attach P2SOP commitment output (default true).\n"
              "  \"texts\"    (array):  For encoding=\"text_multi\", array of strings → multiple 0x01 TLVs.\n"
              "  \"subtractfeefromamount\" (bool): Subtract fee from the send amount.\n"
-             "  \"replaceable\" (bool): Make the transaction BIP125 replaceable.",
+             "  \"replaceable\" (bool): Make the transaction BIP125 replaceable.\n"
+             "  \"raw_tlv\"  (bool):   For encoding=\"hex\": treat payload as a complete TLV sequence and use it as-is (no BLOB wrapper).",
              {
                  {"encoding", RPCArg::Type::STR, RPCArg::Optional::OMITTED,
                   "Payload encoding: \"text\" (default), \"text_multi\", \"json\" or \"hex\"."},
@@ -550,6 +572,8 @@ RPCHelpMan segopsend()
                   "Subtract the fee from the send amount."},
                  {"replaceable", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
                   "Mark the transaction BIP125 replaceable."},
+                 {"raw_tlv", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED,
+                  "For encoding=\"hex\": treat payload as a complete TLV sequence and use it as-is (no BLOB wrapper)."},
              },
             },
         },

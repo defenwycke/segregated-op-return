@@ -1,67 +1,224 @@
 .inspector-root {
-  color: #eee;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr);
+  gap: 12px;
+}
+
+.inspector-card {
+  border-radius: 8px;
+  border: 1px solid #222;
+  background: #050505;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inspector-input h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #ff9900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inspector-output h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #ff9900;
 }
 
 .inspector-intro {
-  font-size: 13px;
-  color: #bbb;
-  margin-bottom: 14px;
-}
-
-.inspector-layout {
-  display: flex;
-  gap: 20px;
-}
-
-.inspector-input,
-.inspector-output {
-  flex: 1;
-  background: #111;
-  border: 1px solid #222;
-  padding: 12px;
-  border-radius: 6px;
-}
-
-.inspector-input label,
-.inspector-output label {
-  display: block;
+  margin: 0;
   font-size: 11px;
-  color: #888;
-  margin-bottom: 4px;
+  color: #aaa;
 }
 
-.inspector-input textarea {
-  width: 100%;
-  height: 120px;
+.inspector-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.inspector-label textarea {
+  min-height: 140px;
+  border-radius: 4px;
+  border: 1px solid #333;
   background: #050505;
   color: #eee;
-  border: 1px solid #333;
-  padding: 6px;
-  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
   resize: vertical;
-  font-size: 12px;
 }
 
-.inspector-input button {
-  margin-top: 10px;
-  padding: 6px 10px;
-  background: #181818;
-  border: 1px solid #333;
+.inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inspector-shared-hint {
+  font-size: 11px;
+  color: #777;
+}
+
+.inspector-card button {
   border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
   color: #eee;
-  font-size: 12px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
-.inspector-input button:hover {
-  border-color: #ff6600;
+.inspector-card button:hover {
+  border-color: #ff9900;
 }
 
-.inspector-output pre {
-  white-space: pre-wrap;
+.inspector-card button.secondary {
   background: #050505;
-  padding: 10px;
+}
+
+/* OUTPUT */
+
+.inspector-output-empty {
+  font-size: 12px;
+  color: #777;
+}
+
+.inspector-section {
+  border-top: 1px solid #222;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+
+.inspector-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.inspector-section h4 {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  color: #ccc;
+}
+
+.inspector-hex {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
   border-radius: 4px;
   border: 1px solid #222;
-  min-height: 120px;
+  background: #020202;
+  padding: 6px 8px;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+}
+
+.inspector-error {
   font-size: 12px;
+  color: #ff7777;
+  background: #200707;
+  border-radius: 4px;
+  border: 1px solid #552222;
+  padding: 6px 8px;
+}
+
+.inspector-header-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.header-fields {
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.field-label {
+  color: #aaa;
+}
+
+.field-value {
+  color: #eee;
+}
+
+.arbda-summary p,
+.arbda-hint {
+  font-size: 12px;
+  margin: 4px 0 0 0;
+  color: #ccc;
+}
+
+/* Tier badges + legend */
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  border: 1px solid transparent;
+}
+
+/* T0 = green, T1 = blue, T2 = orange, T3 = red */
+
+.tier-badge.t0 {
+  background: #103b10;
+  color: #b5ffb5;
+  border-color: #1f7a1f;
+}
+
+.tier-badge.t1 {
+  background: #102c4a;
+  color: #b5d5ff;
+  border-color: #265d9b;
+}
+
+.tier-badge.t2 {
+  background: #4a2b10;
+  color: #ffd6a5;
+  border-color: #b87333;
+}
+
+.tier-badge.t3 {
+  background: #4a1010;
+  color: #ffb5b5;
+  border-color: #993333;
+}
+
+.tier-legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.tier-label {
+  font-size: 11px;
+  color: #ccc;
+}
+
+/* Responsive */
+
+@media (max-width: 1000px) {
+  .inspector-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

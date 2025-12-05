@@ -21,12 +21,7 @@ function encodeHeaderHex(
   const toHex2 = (n: number) => n.toString(16).padStart(2, "0");
   const toHex4 = (n: number) => n.toString(16).padStart(4, "0");
 
-  const valueHex = [
-    toHex2(t),
-    toHex2(ty),
-    toHex4(app),
-    toHex4(ver),
-  ].join("");
+  const valueHex = [toHex2(t), toHex2(ty), toHex4(app), toHex4(ver)].join("");
 
   const lengthHex = toHex2(valueHex.length / 2); // 6 bytes => "06"
   return ("f0" + lengthHex + valueHex).toLowerCase();
@@ -34,19 +29,41 @@ function encodeHeaderHex(
 
 export default function HeaderBuilderCard() {
   const setCurrentPayloadHex = useLabStore(
-    (s: any) => s.setCurrentPayloadHex
+    (s) => s.setCurrentPayloadHex
   );
+  const headerPreset = useLabStore((s) => s.headerPreset);
 
-  const [tier, setTier] = useState("2");        // sensible default: Tier 2
-  const [typeId, setTypeId] = useState("1");    // e.g. "indexed metadata"
-  const [appId, setAppId] = useState("1");      // app registry index
-  const [version, setVersion] = useState("1");  // app/version
+  const [tier, setTier] = useState("2"); // sensible default: Tier 2
+  const [typeId, setTypeId] = useState("1"); // e.g. "indexed metadata"
+  const [appId, setAppId] = useState("1"); // app registry index
+  const [version, setVersion] = useState("1"); // app/version
   const [headerHex, setHeaderHex] = useState("");
   const [notes, setNotes] = useState(
     "Tier 2 / Type 1 – default example header."
   );
 
   const [error, setError] = useState<string | null>(null);
+
+  // Apply preset coming from BUDS Registry
+  useEffect(() => {
+    if (!headerPreset) return;
+
+    if (typeof headerPreset.tier === "number") {
+      setTier(String(headerPreset.tier));
+    }
+    if (typeof headerPreset.typeId === "number") {
+      setTypeId(String(headerPreset.typeId));
+    }
+    if (typeof headerPreset.appId === "number") {
+      setAppId(String(headerPreset.appId));
+    }
+    if (typeof headerPreset.version === "number") {
+      setVersion(String(headerPreset.version));
+    }
+    if (headerPreset.notes && typeof headerPreset.notes === "string") {
+      setNotes(headerPreset.notes);
+    }
+  }, [headerPreset]);
 
   const buildHeader = () => {
     try {

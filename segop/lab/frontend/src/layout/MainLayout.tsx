@@ -1,34 +1,65 @@
-import { Link, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
+import { NavLink } from "react-router-dom";
 import "./MainLayout.css";
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
-  const { pathname } = useLocation();
+interface MainLayoutProps {
+  children: ReactNode;
+}
 
-  const tabs = [
-    { to: "/wallet", label: "Wallet" },
-    { to: "/inspector", label: "Inspector" },
-    { to: "/payloads", label: "Payloads" },
-    { to: "/simulator", label: "Simulator" },
-    { to: "/settings", label: "Settings" },
-  ];
+function navClass(isActive: boolean): string {
+  return isActive ? "nav-item active" : "nav-item";
+}
 
+export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="layout-root">
       <header className="layout-header">
         <div className="logo">
-          segOP<span className="lab">Lab</span>
+          seg<span className="lab">OP Lab</span>
         </div>
-
         <nav className="layout-nav">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.to}
-              className={pathname === tab.to ? "nav-item active" : "nav-item"}
-              to={tab.to}
-            >
-              {tab.label}
-            </Link>
-          ))}
+          <NavLink
+            to="/infoview"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Info
+          </NavLink>
+          <NavLink
+            to="/wallet"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Wallet
+          </NavLink>
+          <NavLink
+            to="/inspector"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Inspector
+          </NavLink>
+          <NavLink
+            to="/payloads"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Payloads
+          </NavLink>
+          <NavLink
+            to="/simulator"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Simulator
+          </NavLink>
+          <NavLink
+            to="/tests"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Tests
+          </NavLink>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => navClass(isActive)}
+          >
+            Settings
+          </NavLink>
         </nav>
       </header>
 

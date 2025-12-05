@@ -1,11 +1,27 @@
 import { create } from "zustand";
 
-export const useLabStore = create((set) => ({
+type HeaderPreset = {
+  tier?: number;
+  typeId?: number;
+  appId?: number;
+  version?: number;
+  notes?: string;
+} | null;
+
+type LabState = {
+  currentPayloadHex: string;
+  setCurrentPayloadHex: (hex: string) => void;
+
+  headerPreset: HeaderPreset;
+  setHeaderPreset: (preset: HeaderPreset) => void;
+  clearHeaderPreset: () => void;
+};
+
+export const useLabStore = create<LabState>((set) => ({
   currentPayloadHex: "",
   setCurrentPayloadHex: (hex: string) => set({ currentPayloadHex: hex }),
 
-  // New: BUDS header preset for the builder
-  headerPreset: null as any,
-  setHeaderPreset: (preset: any) => set({ headerPreset: preset }),
+  headerPreset: null,
+  setHeaderPreset: (preset: HeaderPreset) => set({ headerPreset: preset }),
   clearHeaderPreset: () => set({ headerPreset: null }),
 }));

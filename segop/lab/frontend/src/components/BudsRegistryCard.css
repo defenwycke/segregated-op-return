@@ -1,0 +1,33 @@
+.budsregistry-tier-pill {
+  display: inline-block;
+  min-width: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-align: center;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* Colour key:
+   T0 = green, T1 = blue, T2 = orange, T3 = red
+*/
+.budsregistry-tier-pill-t0 {
+  background: #004d00;
+  color: #b5ffb5;
+}
+
+.budsregistry-tier-pill-t1 {
+  background: #003366;
+  color: #b5d9ff;
+}
+
+.budsregistry-tier-pill-t2 {
+  background: #663c00;
+  color: #ffd9a3;
+}
+
+.budsregistry-tier-pill-t3 {
+  background: #660000;
+  color: #ffb5b5;
+}

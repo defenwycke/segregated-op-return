@@ -3,36 +3,135 @@ import BudsTagEngine from "../buds/tagEngine";
 import type { ArbdaTier, BudsClassification } from "../buds/tagEngine";
 
 type PolicyProfile = "strict" | "neutral" | "permissive";
+type TxPresetKey =
+  | "custom"
+  | "t1_channel_root"
+  | "t2_anchor_meta"
+  | "t3_junk_inscription"
+  | "t3_large_witness";
 
-const EXAMPLE_TX: any = {
-  txid: "example-txid",
-  vout: [
-    {
-      value: 0.001,
-      scriptPubKey: {
-        asm: "OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG",
-        hex: "76a91400112233445566778899aabbccddeeff0011223388ac",
+// --- Example transactions for presets ---
+
+const PRESET_TXS: Record<TxPresetKey, any> = {
+  custom: {
+    txid: "custom-txid",
+    vout: [],
+    witness: [],
+  },
+  t1_channel_root: {
+    txid: "t1-channel-root",
+    vout: [
+      {
+        value: 0.01,
+        scriptPubKey: {
+          asm: "OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG",
+          hex: "76a91400112233445566778899aabbccddeeff0011223388ac",
+        },
       },
-    },
-    {
-      value: 0,
-      scriptPubKey: {
-        asm: "OP_RETURN 4f505f44415441",
-        hex: "6a0a4f505f44415441",
+      {
+        value: 0,
+        scriptPubKey: {
+          asm: "OP_RETURN 4c325f524f4f545f524556",
+          hex: "6a0c4c325f524f4f545f524556",
+        },
       },
-    },
-  ],
-  witness: [
-    {
-      stack: [
-        "3045022100deadbeefcafebabedeadbeefcafebabedeadbeefcafebabe01",
-        "0202cafebabedeadbeefcafebabedeadbeefcafebabedeadbeef",
-      ],
-    },
-  ],
+    ],
+    witness: [
+      {
+        stack: [
+          "3045022100deadbeefcafebabedeadbeefcafebabedeadbeefcafebabe01",
+          "0202cafebabedeadbeefcafebabedeadbeefcafebabedeadbeef",
+        ],
+      },
+    ],
+  },
+  t2_anchor_meta: {
+    txid: "t2-anchor-meta",
+    vout: [
+      {
+        value: 0.001,
+        scriptPubKey: {
+          asm: "OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG",
+          hex: "76a9148899aabbccddeeff00112233445566778899aabb88ac",
+        },
+      },
+      {
+        value: 0,
+        scriptPubKey: {
+          asm: "OP_RETURN 414e43484f525f4d455441",
+          hex: "6a0c414e43484f525f4d455441",
+        },
+      },
+    ],
+    witness: [
+      {
+        stack: [
+          "3044022055aa55aa55aa55aa55aa55aa55aa55aa55aa55aa55aa55aa022055aa55aa55aa55aa55aa55aa55aa55aa55aa55aa55aa55aa01",
+          "03deadbeefcafebabedeadbeefcafebabedeadbeefcafebabe01",
+        ],
+      },
+    ],
+  },
+  t3_junk_inscription: {
+    txid: "t3-junk-inscription",
+    vout: [
+      {
+        value: 0.0001,
+        scriptPubKey: {
+          asm: "OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG",
+          hex: "76a914abcdefabcdefabcdefabcdefabcdefabcdefabcd88ac",
+        },
+      },
+      {
+        value: 0,
+        scriptPubKey: {
+          asm: "OP_RETURN 4a554e4b5f44415441",
+          hex: "6a0a4a554e4b5f44415441",
+        },
+      },
+    ],
+    witness: [
+      {
+        stack: [
+          // big blob
+          "ff".repeat(700),
+        ],
+      },
+    ],
+  },
+  t3_large_witness: {
+    txid: "t3-large-witness",
+    vout: [
+      {
+        value: 0.0002,
+        scriptPubKey: {
+          asm: "OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG",
+          hex: "76a9141234567890abcdef1234567890abcdef1234567888ac",
+        },
+      },
+    ],
+    witness: [
+      {
+        stack: [
+          "aa".repeat(600), // large but not huge
+          "bb".repeat(300),
+        ],
+      },
+    ],
+  },
 };
 
-const EXAMPLE_TX_JSON = JSON.stringify(EXAMPLE_TX, null, 2);
+const PRESET_LABELS: Record<TxPresetKey, string> = {
+  custom: "Custom (free edit)",
+  t1_channel_root: "T1 – L2 channel root style tx",
+  t2_anchor_meta: "T2 – anchor metadata / index hints",
+  t3_junk_inscription: "T3 – junk / inscription-like payload",
+  t3_large_witness: "T3 – large opaque witness blobs",
+};
+
+function txToPrettyJson(tx: any): string {
+  return JSON.stringify(tx, null, 2);
+}
 
 export default function TagEnginePanel() {
   const [policyProfile, setPolicyProfile] =
@@ -42,7 +141,7 @@ export default function TagEnginePanel() {
 
   const [arbdaTier, setArbdaTier] = useState<ArbdaTier | null>(null);
   const [summaryText, setSummaryText] = useState<string>(
-    "No classification yet. Click “Run Tag Engine”."
+    "No classification yet. Choose a preset and click “Run Tag Engine”."
   );
   const [tagsText, setTagsText] = useState<string>(
     "No tags yet. Run the engine to see per-region labels."
@@ -52,10 +151,25 @@ export default function TagEnginePanel() {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const [txJson, setTxJson] = useState<string>(EXAMPLE_TX_JSON);
+  const [preset, setPreset] = useState<TxPresetKey>("t1_channel_root");
+  const [txJson, setTxJson] = useState<string>(
+    txToPrettyJson(PRESET_TXS["t1_channel_root"])
+  );
   const [txJsonError, setTxJsonError] = useState<string | null>(null);
 
   const humanTier = (t: ArbdaTier | null) => t || "—";
+
+  const handlePresetChange = (value: string) => {
+    const key = value as TxPresetKey;
+    setPreset(key);
+    if (key === "custom") {
+      // keep whatever the user has typed
+      return;
+    }
+    const tx = PRESET_TXS[key];
+    setTxJson(txToPrettyJson(tx));
+    setTxJsonError(null);
+  };
 
   const runEngine = () => {
     try {
@@ -65,7 +179,7 @@ export default function TagEnginePanel() {
       const base = parseFloat(baseMinFeerate) || 0;
       const fee = parseFloat(txFeerate) || 0;
 
-      let tx: any = EXAMPLE_TX;
+      let tx: any;
 
       if (txJson.trim().length > 0) {
         try {
@@ -76,6 +190,9 @@ export default function TagEnginePanel() {
           );
           return;
         }
+      } else {
+        setTxJsonError("No transaction JSON provided.");
+        return;
       }
 
       const engine = new BudsTagEngine(policyProfile);
@@ -146,12 +263,26 @@ export default function TagEnginePanel() {
     <div className="tagengine-root">
       <h3>BUDS Tag Engine (tx JSON)</h3>
       <p className="tagengine-intro">
-        Paste a transaction JSON (txid, vout[*].scriptPubKey, witness) or
-        edit the example below. The engine classifies regions into BUDS
-        labels, derives ARBDA tx tier, and computes a policy score.
+        Choose an example transaction preset or use a custom JSON. The engine
+        classifies regions into BUDS labels, derives ARBDA tx tier, and
+        computes a policy score.
       </p>
 
       <div className="tagengine-controls">
+        <div className="tagengine-row">
+          <label>Preset</label>
+          <select
+            value={preset}
+            onChange={(e) => handlePresetChange(e.target.value)}
+          >
+            {Object.entries(PRESET_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="tagengine-row">
           <label>Policy profile</label>
           <select
@@ -195,7 +326,10 @@ export default function TagEnginePanel() {
         <label>Transaction JSON</label>
         <textarea
           value={txJson}
-          onChange={(e) => setTxJson(e.target.value)}
+          onChange={(e) => {
+            setTxJson(e.target.value);
+            setPreset("custom");
+          }}
         />
         {txJsonError && (
           <div className="payloads-error">{txJsonError}</div>

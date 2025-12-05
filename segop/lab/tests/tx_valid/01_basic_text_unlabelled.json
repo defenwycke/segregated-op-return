@@ -1,0 +1,20 @@
+{
+  "has_segop": true,
+  "version": 1,
+  "size": 12,
+  "hex": "010a48656c6c6f2042554453",
+  "buds_tier_code": "0xff",
+  "buds_tier": "UNSPECIFIED",
+  "buds_type_code": "0xff",
+  "buds_type": "UNSPECIFIED",
+  "arbda_tier": "T3",
+  "tlv": [
+    {
+      "type": "0x01",
+      "length": 10,
+      "value_hex": "48656c6c6f2042554453",
+      "text": "Hello BUDS",
+      "kind": "text"
+    }
+  ]
+}
