@@ -1,0 +1,19 @@
+{
+"has_segop": true,
+"version": 1,
+"size": 8,
+"hex": "0306deadbeef00ff",
+"buds_tier_code": "0xff",
+"buds_tier": "UNSPECIFIED",
+"buds_type_code": "0xff",
+"buds_type": "UNSPECIFIED",
+"arbda_tier": "T3",
+"tlv": [
+{
+"type": "0x03",
+"length": 6,
+"value_hex": "deadbeef00ff",
+"kind": "blob"
+}
+]
+}
