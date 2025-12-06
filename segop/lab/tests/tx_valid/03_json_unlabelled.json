@@ -1,0 +1,20 @@
+{
+  "has_segop": true,
+  "version": 1,
+  "size": 22,
+  "hex": "01147b22666f6f223a22626172222c226e223a34327d",
+  "buds_tier_code": "0xff",
+  "buds_tier": "UNSPECIFIED",
+  "buds_type_code": "0xff",
+  "buds_type": "UNSPECIFIED",
+  "arbda_tier": "T3",
+  "tlv": [
+    {
+      "type": "0x01",
+      "length": 20,
+      "value_hex": "7b22666f6f223a22626172222c226e223a34327d",
+      "text": "{\"foo\":\"bar\",\"n\":42}",
+      "kind": "text"
+    }
+  ]
+}
