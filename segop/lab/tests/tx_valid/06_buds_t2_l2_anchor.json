@@ -1,0 +1,32 @@
+{
+  "has_segop": true,
+  "version": 1,
+  "size": 25,
+  "hex": "f00110f1010101114c3220616e63686f722074657374203031",
+  "buds_tier_code": "0x10",
+  "buds_tier": "T1_METADATA",
+  "buds_type_code": "0x01",
+  "buds_type": "TEXT_NOTE",
+  "arbda_tier": "T1",
+  "tlv": [
+    {
+      "type": "0xf0",
+      "length": 1,
+      "value_hex": "10",
+      "kind": "buds_tier"
+    },
+    {
+      "type": "0xf1",
+      "length": 1,
+      "value_hex": "01",
+      "kind": "buds_type"
+    },
+    {
+      "type": "0x01",
+      "length": 17,
+      "value_hex": "4c3220616e63686f722074657374203031",
+      "text": "L2 anchor test 01",
+      "kind": "text"
+    }
+  ]
+}
