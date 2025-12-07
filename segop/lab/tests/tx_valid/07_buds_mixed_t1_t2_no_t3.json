@@ -1,0 +1,32 @@
+{
+  "has_segop": true,
+  "version": 1,
+  "size": 30,
+  "hex": "f00110f10101011642554453206d697865642054312f5432206e6f205433",
+  "buds_tier_code": "0x10",
+  "buds_tier": "T1_METADATA",
+  "buds_type_code": "0x01",
+  "buds_type": "TEXT_NOTE",
+  "arbda_tier": "T1",
+  "tlv": [
+    {
+      "type": "0xf0",
+      "length": 1,
+      "value_hex": "10",
+      "kind": "buds_tier"
+    },
+    {
+      "type": "0xf1",
+      "length": 1,
+      "value_hex": "01",
+      "kind": "buds_type"
+    },
+    {
+      "type": "0x01",
+      "length": 22,
+      "value_hex": "42554453206d697865642054312f5432206e6f205433",
+      "text": "BUDS mixed T1/T2 no T3",
+      "kind": "text"
+    }
+  ]
+}
