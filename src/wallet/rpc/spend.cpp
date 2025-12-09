@@ -239,7 +239,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
         cc.m_confirm_target = ParseConfirmTarget(conf_target, wallet.chain().estimateMaxBlocks());
     }
 }
-
+////////////////////////////////////////////
 static bool BuildSegopPayloadFromRequest(
     const std::string& user_payload,
     const UniValue& options,
@@ -286,23 +286,26 @@ static bool BuildSegopPayloadFromRequest(
         raw_tlv = r.get_bool();
     }
 
-    // 3. Build TLV payload bytes
+    // 3. Build TLV payload bytes (NO implicit BUDS markers here)
     std::vector<unsigned char> segop_data;
 
     if (encoding == "text") {
-        // BUDS-structured: Tier = T1_METADATA (0x10), Type = TEXT_NOTE (0x01),
-        // followed by a TEXT_UTF8 TLV containing user_payload.
-        const uint8_t RAW_TIER_T1_METADATA = 0x10;
-        const uint8_t RAW_TYPE_TEXT_NOTE   = 0x01;
+        // Single TEXT TLV: [0x01][len][utf8-bytes]
+        std::vector<unsigned char> val(user_payload.begin(), user_payload.end());
 
-        segop_data = BuildSegopBUDSTextPayload(
-            RAW_TIER_T1_METADATA,
-            RAW_TYPE_TEXT_NOTE,
-            user_payload
-        );
+        if (val.size() > 255) {
+            error_out = "text payload too long for a single segOP TEXT TLV (max 255 bytes)";
+            return false;
+        }
+
+        segop_data.clear();
+        segop_data.reserve(2 + val.size());
+        segop_data.push_back(0x01); // TEXT type
+        segop_data.push_back(static_cast<unsigned char>(val.size())); // length
+        segop_data.insert(segop_data.end(), val.begin(), val.end());
 
     } else if (encoding == "text_multi") {
-        // Multi-TLV TEXT sequence, source is options["texts"] array
+        // Multi-TLV TEXT sequence from options["texts"] array
         if (!options.exists("texts")) {
             error_out = "\"texts\" array is required when encoding=\\\"text_multi\\\"";
             return false;
@@ -328,7 +331,17 @@ static bool BuildSegopPayloadFromRequest(
             texts.push_back(v.get_str());
         }
 
-        segop_data = BuildSegopTextTlvMulti(texts);
+        segop_data.clear();
+        for (const auto& s : texts) {
+            std::vector<unsigned char> val(s.begin(), s.end());
+            if (val.size() > 255) {
+                error_out = "\"texts\" element too long for a single segOP TEXT TLV (max 255 bytes)";
+                return false;
+            }
+            segop_data.push_back(0x01); // TEXT type
+            segop_data.push_back(static_cast<unsigned char>(val.size())); // length
+            segop_data.insert(segop_data.end(), val.begin(), val.end());
+        }
 
     } else if (encoding == "json") {
         // JSON_UTF8 TLV (no consensus-level JSON validation)
@@ -400,7 +413,6 @@ static bool BuildSegopPayloadFromRequest(
         return false;
     }
 
-
     // 4. Populate CSegopPayload
     out.SetNull();
     out.version = version;
@@ -419,6 +431,7 @@ static bool BuildSegopPayloadFromRequest(
     return true;
 }
 
+///////////////////////////////////////////
 // Build the P2SOP OP_RETURN script that commits to segOP payload.
 // This must match the consensus expectations in tx_check.cpp:
 //   OP_RETURN 0x23 "SOP" [32-byte commitment]
