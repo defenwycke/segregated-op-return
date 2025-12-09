@@ -4,6 +4,7 @@ add_library(segop STATIC
     segop_prune.cpp
     buds.cpp
     segop_buds_registry.cpp
+    segop_buds_classify.cpp
 )
 
 # Ensure it’s compiled as C++
