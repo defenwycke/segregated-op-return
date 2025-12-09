@@ -51,30 +51,20 @@ Example:
 
 ### 2.1 Basic segOP TLVs
 
-| ID | Files (prefix)                     | Category          | Description                                                                                         | Expected Behaviour |
-|----|-----------------------------------|-------------------|-----------------------------------------------------------------------------------------------------|--------------------|
-| 01 | 01_basic_text_unlabelled         | TLV: TEXT         | Single TEXT TLV `"Hello BUDS"`. No BUDS tier/type markers.                                         | `buds_tier = UNSPECIFIED`, `buds_type = UNSPECIFIED`, `arbda_tier = T3`. |
-| 02 | 02_text_multi_unlabelled         | TLV: TEXT_MULTI   | `encoding = "text_multi"` → two TEXT TLVs (`"first"`, `"second"`). No BUDS markers.                | TLV array length 2, both `kind = "text"`, `arbda_tier = T3`. |
-| 03 | 03_json_unlabelled               | TLV: JSON         | JSON TLV with object `{"foo":"bar","n":42}`.                                                       | TLV type `0x02` (`kind = "json"`), RPC decode shows parsed object, `arbda_tier = T3`. |
-| 04 | 04_blob_unlabelled               | TLV: BLOB         | Binary blob TLV with `deadbeef00ff`                                                                | TLV type `0x03` (`kind = "blob"`), `arbda_tier = T3`. |
-
-### 2.2 BUDS Tier / Type + ARBDA Mapping
-
-| ID | Files (prefix)                | Category        | Description                                                                                                              | Expected Behaviour |
-|----|------------------------------|-----------------|--------------------------------------------------------------------------------------------------------------------------|--------------------|
-| 10 | 10_buds_t1_textnote          | BUDS T1/TEXT    | TLV sequence: Tier TLV `0xF0 = 0x10` → `T1_METADATA`; Type TLV `0xF1 = 0x01` → `TEXT_NOTE`; then TEXT body.             | `buds_tier_code = 0x10` → `T1_METADATA`; `buds_type_code = 0x01` → `TEXT_NOTE`; `arbda_tier = T1`; TLV kinds: tier / type / text. |
-| 11 | 11_buds_t2_l2_anchor         | BUDS T2/L2      | Tier TLV `0xF0 = 0x20` → `T2_OPERATIONAL`; Type TLV `0xF1 = <L2_STATE_ANCHOR>`; TEXT/JSON body describing an L2 anchor. | `buds_tier = T2_OPERATIONAL`; `buds_type = L2_STATE_ANCHOR`; `arbda_tier = T2`. |
-| 12 | 12_buds_mixed_t1_t2_no_t3    | BUDS mixed      | Multiple tier markers: at least one `T1`, at least one `T2`, no `T3`.                                                   | `presence.has_t1 = true`, `presence.has_t2 = true`, `ambiguous = true`, `tier = AMBIGUOUS`, `arbda_tier = T2`. |
-| 13 | 13_buds_unlabelled_t3        | Unlabelled T3   | segOP payload with no Tier/Type TLVs (like 01–04) but documented as “unlabelled BUDS = ARBDA T3”.                       | `has_tier = false`, `presence.has_t3 = true` (by rule “segOP exists but no tier markers”), `arbda_tier = T3`. |
-| 14 | 14_buds_explicit_t3_marker   | Explicit T3     | Tier TLV `0xF0 = 0x30` → `T3_ARBITRARY` plus arbitrary text/blob body.                                                  | `buds_tier = T3_ARBITRARY`, `arbda_tier = T3`. |
-
-### 2.3 P2SOP / Structural Invariants
-
-| ID | Files (prefix)                | Category           | Description                                                                                             | Expected Behaviour |
-|----|------------------------------|--------------------|---------------------------------------------------------------------------------------------------------|--------------------|
-| 20 | 20_segop_with_single_p2sop   | Canonical segOP    | Typical `segopsend` tx: segOP flag set, **exactly one** P2SOP `OP_RETURN`, correct commitment.         | Fully valid, used as reference “canonical segOP tx”. |
-| 21 | 21_segop_no_witness          | Legacy + segOP     | Non-SegWit tx using segOP lane (`flag & 0x02 != 0`, `witness` flag clear).                             | Valid under segOP rules (segOP bit only). |
-| 22 | 22_segop_with_witness        | SegWit + segOP     | Combined SegWit + segOP (`flag = 0x03`): standard txid/wtxid plus extra segOP section.                 | Valid; txid/wtxid unchanged, segOP parsed as extra lane. |
+| #  | File stem                     | Scenario                                                            | Status |
+| -- | ----------------------------- | -------------------------------------------------------------------- | ------ |
+| 01 | 01_basic_text_unlabelled      | Single text TLV, unlabelled, no BUDS markers                        | DONE   |
+| 02 | 02_text_multi_unlabelled      | Multiple text TLVs, unlabelled                                      | DONE   |
+| 03 | 03_json_unlabelled            | JSON-ish string in a TEXT TLV, unlabelled                           | DONE   |
+| 04 | 04_blob_unlabelled            | Opaque BLOB TLV (`deadbeef00ff`) unlabelled                         | DONE   |
+| 05 | 05_buds_t1_textnote           | BUDS T1 text note example (tier marker present)                     | DONE   |
+| 06 | 06_buds_t2_l2_anchor          | BUDS T2 L2 anchor example (tier marker present; FIXME classification)| DONE  |
+| 07 | 07_buds_mixed_t1_t2_no_t3     | Mixed tier context, no T3                                           | DONE   |
+| 08 | 08_buds_unlabelled_t3         | Heuristically T3-like payload with no explicit marker               | DONE   |
+| 09 | 09_buds_explicit_t3_marker    | Explicit T3 marker in TLV                                           | DONE   |
+| 10 | 10_segop_with_single_p2sop    | Canonical segOP tx: flag set, exactly one P2SOP, segOP lane present | DONE   |
+| 11 | 11_segop_no_witness           | segOP tx with segwit stripped (non-witness spend path)              | DONE   |
+| 12 | 12_segop_with_witness         | segOP tx with witness present                                       | DONE   |
 
 ---
 
