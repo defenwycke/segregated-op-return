@@ -1,0 +1,110 @@
+{
+  "version": 2,
+  "labels": [
+    {
+      "label": "consensus.sig",
+      "description": "Signatures required for transaction validation.",
+      "surfaces": ["witness_stack", "scriptsig"],
+      "suggested_tier": "T0"
+    },
+    {
+      "label": "consensus.script",
+      "description": "Executed script regions that enforce spending conditions.",
+      "surfaces": ["scriptsig", "witness_script", "scriptpubkey"],
+      "suggested_tier": "T0"
+    },
+    {
+      "label": "consensus.taproot_prog",
+      "description": "Taproot or tapscript programs used in validation.",
+      "surfaces": ["witness_script"],
+      "suggested_tier": "T0"
+    },
+
+    {
+      "label": "pay.standard",
+      "description": "Standard payments and transfers to common scriptpubkey types.",
+      "surfaces": ["scriptpubkey"],
+      "suggested_tier": "T1"
+    },
+    {
+      "label": "pay.channel_open",
+      "description": "Lightning or L2 channel establishment outputs.",
+      "surfaces": ["scriptpubkey", "witness_script"],
+      "suggested_tier": "T1"
+    },
+    {
+      "label": "pay.channel_update",
+      "description": "Updates or closes for channel or L2 contract state.",
+      "surfaces": ["witness_stack", "witness_script"],
+      "suggested_tier": "T1"
+    },
+    {
+      "label": "contracts.vault",
+      "description": "Vault or recovery contract structures.",
+      "surfaces": ["scriptpubkey", "witness_script"],
+      "suggested_tier": "T1"
+    },
+    {
+      "label": "commitment.rollup_root",
+      "description": "Commitments anchoring L2 or rollup state to Bitcoin.",
+      "surfaces": ["scriptpubkey", "witness_stack", "coinbase"],
+      "suggested_tier": "T1"
+    },
+    {
+      "label": "meta.pool_tag",
+      "description": "Mining pool identification or metadata in coinbase.",
+      "surfaces": ["coinbase"],
+      "suggested_tier": "T1"
+    },
+
+    {
+      "label": "da.op_return_embed",
+      "description": "Explicit metadata embedded using OP_RETURN.",
+      "surfaces": ["op_return"],
+      "suggested_tier": "T2"
+    },
+    {
+      "label": "meta.inscription",
+      "description": "Known inscription-style payloads or formats.",
+      "surfaces": ["witness_stack", "op_return"],
+      "suggested_tier": "T2"
+    },
+    {
+      "label": "meta.ordinal",
+      "description": "Ordinal or NFT-related metadata.",
+      "surfaces": ["witness_stack", "op_return"],
+      "suggested_tier": "T2"
+    },
+    {
+      "label": "meta.indexer_hint",
+      "description": "Optional hints intended for external indexers or apps.",
+      "surfaces": ["op_return", "scriptpubkey", "witness_stack"],
+      "suggested_tier": "T2"
+    },
+    {
+      "label": "da.embed_misc",
+      "description": "General-purpose embedded metadata not covered by specific labels.",
+      "surfaces": ["op_return", "scriptpubkey", "witness_stack"],
+      "suggested_tier": "T2"
+    },
+
+    {
+      "label": "da.unknown",
+      "description": "Unclassified data that does not match any known pattern.",
+      "surfaces": ["scriptsig", "witness_stack", "witness_script", "scriptpubkey", "op_return", "coinbase"],
+      "suggested_tier": "T3"
+    },
+    {
+      "label": "da.obfuscated",
+      "description": "Large, opaque, or intentionally hidden data blobs.",
+      "surfaces": ["scriptsig", "witness_stack", "witness_script", "scriptpubkey"],
+      "suggested_tier": "T3"
+    },
+    {
+      "label": "da.unregistered_vendor",
+      "description": "Structured vendor-specific data for which no public label exists.",
+      "surfaces": ["witness_stack", "witness_script", "scriptpubkey"],
+      "suggested_tier": "T3"
+    }
+  ]
+}
