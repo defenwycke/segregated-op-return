@@ -1,40 +1,35 @@
-#ifndef BITCOIN_SEGOP_BUDS_CLASSIFY_H
-#define BITCOIN_SEGOP_BUDS_CLASSIFY_H
+#pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include <segop/segop_extract_surfaces.h>
+
 class CTransaction;
-class CSegopPayload;
 
 namespace segop {
 
-/** Result of BUDS classification for a single transaction. */
-struct SegopBudsResult {
-    uint8_t buds_tier_code;   // 0x00..0x03, or 0xff when unspecified
-    std::string buds_tier;    // "T0","T1","T2","T3","UNSPECIFIED"
+// Final BUDS classification result for one transaction (segOP-local + ARBDA-style tier).
+struct SegopBudsClassification {
+    uint8_t tier_code{0xff};           // BUDS T0..T3 as compact code
+    std::string tier{"UNSPECIFIED"};   // e.g. "T1", "T2", "T3"
 
-    uint8_t buds_type_code;   // arbitrary type code (registry / engine defined), or 0xff
-    std::string buds_type;    // e.g. "PAY_STANDARD","EMBED_MISC","UNKNOWN"
+    uint8_t type_code{0xff};           // BUDS type code within the tier
+    std::string type{"UNSPECIFIED"};   // e.g. "TEXT_NOTE", etc.
 
-    std::string arbda_tier;   // "T0","T1","T2","T3"
+    std::string arbda_tier{"T3"};      // ARBDA style tier string ("T0".."T3")
 
-    // Labels matched from the registry for this tx (e.g. "pay.standard", "da.embed_misc")
-    std::vector<std::string> labels;
+    bool ambiguous{false};             // Multiple conflicting labels?
+    std::vector<std::string> matched_labels; // Debug/inspection: which labels matched.
 };
 
-/**
- * BUDS classifier entry point for segOP.
- *
- * - Looks at the full CTransaction (all outputs, and segOP lane if present).
- * - Uses the embedded BUDS v2 registry for label → tier mapping.
- * - Returns a conservative classification; can be refined over time
- *   without changing this public interface.
- */
-SegopBudsResult ClassifyTransactionWithBUDS(const CTransaction& tx,
-                                            const CSegopPayload* segop_payload);
+// Classify already-extracted surfaces.
+bool ClassifyTransactionBuds(const ExtractedSurfaces& surfaces,
+                             SegopBudsClassification& out);
+
+// Convenience wrapper: extract from tx & classify.
+bool ClassifyFromTransaction(const CTransaction& tx,
+                             SegopBudsClassification& out);
 
 } // namespace segop
-
-#endif // BITCOIN_SEGOP_BUDS_CLASSIFY_H

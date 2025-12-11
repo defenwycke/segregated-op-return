@@ -4,6 +4,9 @@
 
 #include <segop/segop.h>
 #include <segop/segop_prune.h>
+#include <segop/segop_buds_registry.h>
+#include <segop/segop_buds_classify.h>
+#include <segop/segop_extract_surfaces.h>
 
 // This translation unit currently just ensures segOP helper code
 // and pruning policy interfaces are linked into libsegop.

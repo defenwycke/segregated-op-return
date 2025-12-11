@@ -1,4 +1,3 @@
-// Copyright (c) 2025 Defenwycke - segOP
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
@@ -33,7 +32,6 @@
 #include <script/sign.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
-#include <segop/segop_prune.h>
 #include <span.h>
 #include <uint256.h>
 #include <undo.h>
@@ -52,6 +50,10 @@
 
 #include <crypto/sha256.h> // segOP: for P2SOP commitment hashing
 #include <segop/segop.h>          // CSegopPayload
+#include <segop/segop_prune.h>
+#include <segop/segop_buds_classify.h>
+#include <segop/segop_extract_surfaces.h>
+
 
 using node::AnalyzePSBT;
 using node::FindCoins;
@@ -689,20 +691,39 @@ RPCHelpMan decodesegop()
             result.pushKV("size", (uint64_t)mtx.segop_payload.data.size());
             result.pushKV("hex", HexStr(mtx.segop_payload.data));
 
-            // --- BUDS structured tiering + ARBDA (segOP-local view) ---
-            SegopBUDSInfo buds = SegopExtractBUDSInfo(mtx.segop_payload.data);
+            // --- BUDS full-surface classifier + ARBDA view ---
 
+            // Extract all relevant surfaces from the transaction
+            // Work on an immutable transaction view
+            const CTransaction tx(mtx);
+
+            segop::ExtractedSurfaces surfaces = segop::ExtractAllSurfaces(tx);
+
+            // Run the BUDS classifier
+            segop::SegopBudsClassification buds;
+            segop::ClassifyTransactionBuds(surfaces, buds);
+
+            // Export classification to JSON
             result.pushKV("buds_tier_code", strprintf("0x%02x", buds.tier_code));
-            result.pushKV("buds_tier", segop::ToString(buds.tier));
+            result.pushKV("buds_tier", buds.tier);
 
             result.pushKV("buds_type_code", strprintf("0x%02x", buds.type_code));
-            result.pushKV("buds_type", segop::ToString(buds.type));
+            result.pushKV("buds_type", buds.type);
 
-            result.pushKV("arbda_tier", segop::ToString(buds.arbda));
+            // ARBDA tier derived from BUDS tier for now
+            result.pushKV("arbda_tier", buds.arbda_tier);
+
+            // List of labels that matched across all surfaces
+            UniValue labels(UniValue::VARR);
+            for (const auto& lbl : buds.matched_labels) {
+                labels.push_back(lbl);
+            }
+            result.pushKV("buds_matches", labels);
 
             if (buds.ambiguous) {
-                result.pushKV("buds_warning", "Multiple conflicting tier markers (AMBIGUOUS)");
+                result.pushKV("buds_warning", "Ambiguous multi-surface classification");
             }
+
 
             // TLV breakdown
 

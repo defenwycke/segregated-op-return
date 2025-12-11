@@ -1,14 +1,12 @@
-# SegOP module
+# src/segop/CMakeLists.txt
 add_library(segop STATIC
     segop.cpp
     segop_prune.cpp
     buds.cpp
     segop_buds_registry.cpp
+    segop_extract_surfaces.cpp
     segop_buds_classify.cpp
 )
 
-# Ensure it’s compiled as C++
 set_target_properties(segop PROPERTIES LINKER_LANGUAGE CXX)
-
-# Make headers visible to the rest of the project
 target_include_directories(segop PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
